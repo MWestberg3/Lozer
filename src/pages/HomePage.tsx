@@ -1,30 +1,41 @@
 import { Link } from 'react-router-dom'
+import { WorkoutDayCarousel } from '../components/WorkoutDayCarousel'
 import { useApp } from '../context/AppContext'
 import { getSessionsForUser } from '../storage/db'
+import { buildDaySchedule, formatTodayHeading } from '../lib/schedule'
 import { formatDate, sessionStats } from '../lib/progress'
-
 export function HomePage() {
   const { state, activeUser, program } = useApp()
   const sessions = getSessionsForUser(state)
   const latest = sessions[0]
+  const today = new Date()
+  const schedule = buildDaySchedule(program, sessions)
+  const todaySlot = schedule[0]
 
   return (
     <section>
+      <p className="calendar-today">{formatTodayHeading(today)}</p>
       <h1 className="page-title">Lozer</h1>
       <p className="subtitle">Training plan for {activeUser.displayName}</p>
 
-      <div className="card">
-        <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>Active program</div>
-        <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{program.name}</div>
-        <p style={{ margin: '0.5rem 0 0', color: 'var(--muted)', fontSize: '0.9rem' }}>
-          {program.description}
+      <div className={`card today-workout ${todaySlot.completedToday ? 'is-complete' : ''}`}>
+        <div className="today-workout-badge">{todaySlot.completedToday ? 'Completed' : 'Today'}</div>
+        <strong className="today-workout-name">{todaySlot.day.name}</strong>
+        <p className="today-workout-focus">{todaySlot.day.focus}</p>
+        <p className="today-workout-meta">
+          {todaySlot.day.exercises.length} exercises · {program.name}
         </p>
-        <p style={{ margin: '0.75rem 0 0', fontSize: '0.85rem' }}>
-          {program.daysPerWeek} days / week · {program.days.length} workouts in rotation
-        </p>
+        <Link
+          to={`/workout/preview?day=${encodeURIComponent(todaySlot.day.id)}`}
+          className="btn btn-primary"
+        >
+          Preview workout
+        </Link>
       </div>
 
-      <div className="stat-grid" style={{ marginTop: '0.75rem' }}>
+      <WorkoutDayCarousel slots={schedule} />
+
+      <div className="stat-grid" style={{ marginTop: '1rem' }}>
         <div className="stat">
           <strong>{sessions.length}</strong>
           <span>Workouts</span>
@@ -55,13 +66,9 @@ export function HomePage() {
         </div>
       ) : (
         <div className="card" style={{ marginTop: '0.75rem' }}>
-          No workouts logged yet for this profile. Start your first session.
+          No workouts logged yet. Preview today&apos;s workout above to get started.
         </div>
       )}
-
-      <Link to="/workout" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-        Start training
-      </Link>
     </section>
   )
 }

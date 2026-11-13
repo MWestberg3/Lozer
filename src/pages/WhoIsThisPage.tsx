@@ -72,7 +72,7 @@ export function WhoIsThisPage() {
         </form>
 
         {accessDenied && (
-          <p className="card" style={{ marginTop: '0.75rem', color: '#ff8a7a' }} role="alert">
+          <p className="card alert-text" style={{ marginTop: '0.75rem' }} role="alert">
             That account isn&apos;t allowed on this app.
             <button
               type="button"
@@ -86,7 +86,7 @@ export function WhoIsThisPage() {
         )}
 
         {error && (
-          <p style={{ color: '#ff8a7a', fontSize: '0.9rem', marginTop: '0.75rem' }} role="alert">
+          <p className="alert-text" style={{ fontSize: '0.9rem', marginTop: '0.75rem' }} role="alert">
             {error}
           </p>
         )}

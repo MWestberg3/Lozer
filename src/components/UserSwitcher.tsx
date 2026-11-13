@@ -40,7 +40,7 @@ export function UserSwitcher() {
           </span>
         )}
         <div>
-          <div style={{ fontWeight: 600 }}>{activeUser.displayName}</div>
+          <div className="user-display-name">{activeUser.displayName}</div>
           <div style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>{googleName}</div>
         </div>
       </div>

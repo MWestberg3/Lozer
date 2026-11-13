@@ -28,17 +28,9 @@ export function ProgressPage() {
         Exercise
       </label>
       <select
+        className="field-select"
         value={exerciseId}
         onChange={(e) => setExerciseId(e.target.value)}
-        style={{
-          width: '100%',
-          padding: '0.65rem',
-          borderRadius: '10px',
-          border: '1px solid var(--border)',
-          background: '#0c1016',
-          color: '#fff',
-          marginBottom: '0.75rem',
-        }}
       >
         {exercises.map((exercise) => (
           <option key={exercise.id} value={exercise.id}>

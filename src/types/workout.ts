@@ -1,9 +1,49 @@
 export type UserId = string
 
+export type Equipment = 'barbell' | 'dumbbell' | 'cable' | 'machine' | 'bodyweight' | 'kettlebell'
+export type DayType = 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full'
+export type TrainingGoal = 'strength' | 'hypertrophy'
+
+export type ThemeColorId =
+  | 'orange'
+  | 'pink'
+  | 'red'
+  | 'amber'
+  | 'green'
+  | 'teal'
+  | 'blue'
+  | 'purple'
+
+export interface GeneratorSettings {
+  goal: TrainingGoal
+  daysPerWeek: 3 | 4 | 5
+}
+
 export interface UserProfile {
   id: UserId
   displayName: string
   activeProgramId: string
+}
+
+export interface LibraryExercise {
+  id: string
+  name: string
+  muscleGroup: string
+  dayTypes: DayType[]
+  equipment: Equipment[]
+  compound: boolean
+  defaultSets: number
+  defaultRepsStrength: string
+  defaultRepsHypertrophy: string
+  restSecondsHeavy: number
+  restSecondsDefault: number
+  swapGroup?: string
+  instructions?: string[]
+  imageUrl?: string | null
+  level?: string
+  sourceId?: string
+  /** Raw equipment string from the exercise library (used for user equipment filters). */
+  libraryEquipment: string
 }
 
 export interface ExerciseTemplate {
@@ -28,6 +68,7 @@ export interface Program {
   description: string
   daysPerWeek: number
   days: WorkoutDayTemplate[]
+  generatedAt?: string
 }
 
 export interface SetLog {
@@ -59,6 +100,13 @@ export interface AppState {
   profile: UserProfile
   programs: Program[]
   sessions: WorkoutSession[]
+  generatorSettings: GeneratorSettings
+  /** Raw library equipment strings the user has available (`free-exercise-db` values). */
+  enabledLibraryEquipment: string[]
+  /** UI accent preset (buttons, chips, highlights). */
+  primaryColorId: ThemeColorId
+  /** Exercise ids the user never wants auto-recommended (per Firebase account). */
+  dislikedExerciseIds: string[]
 }
 
 export interface ExerciseProgressPoint {

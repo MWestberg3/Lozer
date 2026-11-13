@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { RestTimer } from '../components/RestTimer'
 import { useApp } from '../context/AppContext'
 import { getSessionsForUser } from '../storage/db'
@@ -28,10 +28,18 @@ function buildExerciseLogs(day: WorkoutDayTemplate, priorSessions: WorkoutSessio
 
 export function WorkoutPage() {
   const navigate = useNavigate()
-  const { state, activeUser, program, completeWorkout } = useApp()
+  const [searchParams] = useSearchParams()
+  const { state, activeUser, program, completeWorkout, isExerciseDisliked, setExerciseDislikedPreference } =
+    useApp()
   const priorSessions = getSessionsForUser(state)
 
-  const [dayId, setDayId] = useState(program.days[0]?.id ?? '')
+  const dayFromQuery = searchParams.get('day')
+  const defaultDayId =
+    dayFromQuery && program.days.some((d) => d.id === dayFromQuery)
+      ? dayFromQuery
+      : (program.days[0]?.id ?? '')
+
+  const [dayId, setDayId] = useState(defaultDayId)
   const selectedDay = program.days.find((d) => d.id === dayId) ?? program.days[0]
 
   const [exerciseLogs, setExerciseLogs] = useState<ExerciseLog[]>(() =>
@@ -41,7 +49,7 @@ export function WorkoutPage() {
   const [restRunning, setRestRunning] = useState(false)
   const [restSeconds, setRestSeconds] = useState(90)
   const [startedAt] = useState(() => new Date().toISOString())
-  const [inSession, setInSession] = useState(false)
+  const [inSession, setInSession] = useState(() => searchParams.get('start') === '1')
 
   const activeExercise = useMemo(() => {
     if (!selectedDay) return null
@@ -148,6 +156,16 @@ export function WorkoutPage() {
           <div style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
             Target {activeExercise.defaultSets} × {activeExercise.defaultReps} · {activeExercise.muscleGroup}
           </div>
+          {!isExerciseDisliked(activeExercise.id) && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-small"
+              style={{ marginTop: '0.65rem' }}
+              onClick={() => setExerciseDislikedPreference(activeExercise.id, true)}
+            >
+              Don&apos;t recommend again
+            </button>
+          )}
         </div>
       )}
 
