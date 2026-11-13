@@ -1,0 +1,11 @@
+node_modules
+dist
+.DS_Store
+dev-dist
+
+# Secrets and local env (commit .env.example only)
+.env
+.env.local
+.env.*.local
+.env.production
+*.local
