@@ -64,11 +64,36 @@ export interface ExerciseTemplate {
   restSeconds: number
 }
 
+export type WorkoutBlockType = 'straight' | 'circuit'
+
+export interface BlockMovement {
+  id: string
+  exerciseId: string
+  name: string
+  muscleGroup: string
+  sets: number
+  reps: string
+  restSeconds: number
+}
+
+export interface WorkoutBlock {
+  id: string
+  type: WorkoutBlockType
+  label?: string
+  rounds?: number
+  restBetweenRoundsSec?: number
+  restBetweenStationsSec?: number
+  /** Rest after this block before the next (defaults to between-rounds on circuits). */
+  restAfterBlockSec?: number
+  movements: BlockMovement[]
+}
+
 export interface WorkoutDayTemplate {
   id: string
   name: string
   focus: string
   exercises: ExerciseTemplate[]
+  blocks?: WorkoutBlock[]
   rotationMuscleGroups?: string[]
   rotationWeek?: number
   rotationDayIndex?: number

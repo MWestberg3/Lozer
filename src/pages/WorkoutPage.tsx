@@ -104,7 +104,7 @@ export function WorkoutPage() {
       exercises: exerciseLogs,
     }
     completeWorkout(session)
-    navigate('/history')
+    navigate('/settings')
   }
 
   if (!selectedDay) {

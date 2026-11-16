@@ -1,12 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import {
-  IconHistory,
-  IconHome,
-  IconProgress,
-  IconSettings,
-  IconTrain,
-} from './BottomNavIcons'
+import { IconHome, IconLibrary, IconProgress, IconSettings, IconWeight } from './BottomNavIcons'
 import type { ReactNode } from 'react'
 
 interface NavLinkItem {
@@ -18,10 +12,10 @@ interface NavLinkItem {
 
 /** Home is centered; two tabs on each side. */
 const links: NavLinkItem[] = [
-  { to: '/library', label: 'Library', icon: <IconTrain /> },
+  { to: '/library', label: 'Library', icon: <IconLibrary /> },
   { to: '/progress', label: 'Progress', icon: <IconProgress /> },
   { to: '/home', label: 'Home', icon: <IconHome />, center: true },
-  { to: '/history', label: 'History', icon: <IconHistory /> },
+  { to: '/plan', label: 'Plan', icon: <IconWeight /> },
   { to: '/settings', label: 'Settings', icon: <IconSettings /> },
 ]
 

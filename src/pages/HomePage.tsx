@@ -44,8 +44,8 @@ export function HomePage() {
           <p className="generator-panel-copy" style={{ marginTop: '0.35rem' }}>
             Your plan will show here once workouts are set up. Adjust plan preferences in Settings anytime.
           </p>
-          <Link to="/settings" className="btn btn-primary" style={{ marginTop: '0.75rem' }}>
-            Plan preferences
+          <Link to="/plan" className="btn btn-primary" style={{ marginTop: '0.75rem' }}>
+            Workout Plan
           </Link>
         </div>
       )}

@@ -7,9 +7,10 @@ import { HomePage } from './pages/HomePage'
 import { WorkoutPage } from './pages/WorkoutPage'
 import { WorkoutPreviewPage } from './pages/WorkoutPreviewPage'
 import { ProgressPage } from './pages/ProgressPage'
-import { HistoryPage } from './pages/HistoryPage'
 import { LibraryPage } from './pages/LibraryPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { WorkoutPlanPage } from './pages/WorkoutPlanPage'
+import { WorkoutPlanBuildPage } from './pages/WorkoutPlanBuildPage'
 
 export default function App() {
   return (
@@ -24,8 +25,10 @@ export default function App() {
               <Route path="/workout/preview" element={<WorkoutPreviewPage />} />
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/progress" element={<ProgressPage />} />
-              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/plan" element={<WorkoutPlanPage />} />
+              <Route path="/plan/build" element={<WorkoutPlanBuildPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/history" element={<Navigate to="/settings" replace />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,10 @@
 import { equipmentLabel, LIBRARY_EQUIPMENT_OPTIONS } from './equipment'
 import { equipmentMatchesUserGear } from './freeExerciseDb'
-import { blueprintFromMuscleGroups, normalizeCustomRotationMuscles } from './muscleRotation'
+import {
+  blueprintFromMuscleGroups,
+  defaultMuscleGroupsForDayIndex,
+  normalizeCustomRotationMuscles,
+} from './muscleRotation'
 import type {
   CustomRotationWeeks,
   DayType,
@@ -87,6 +91,37 @@ function planDays(settings: GeneratorSettings, catalog: LibraryExercise[]): Plan
       slots: built.slots,
     }
     return { blueprint, rotationMuscleGroups: muscleGroups, rotationWeek, rotationDayIndex }
+  })
+}
+
+export interface PlanSlotInfo {
+  id: string
+  name: string
+  focus: string
+  muscleGroups: string[]
+  rotationWeek: number
+  rotationDayIndex: number
+  chipLabel: string
+}
+
+export function listPlanSlots(settings: GeneratorSettings, catalog: LibraryExercise[]): PlanSlotInfo[] {
+  return planDays(settings, catalog).map((planned) => {
+    const muscleGroups = planned.rotationMuscleGroups.length
+      ? planned.rotationMuscleGroups
+      : defaultMuscleGroupsForDayIndex(settings.daysPerWeek, planned.rotationDayIndex)
+    const multiWeek = settings.rotationMode === 'custom' && settings.customRotationWeeks > 1
+    const chipLabel = multiWeek
+      ? `W${planned.rotationWeek} D${planned.rotationDayIndex + 1}`
+      : `Day ${planned.rotationDayIndex + 1}`
+    return {
+      id: planned.blueprint.id,
+      name: planned.blueprint.name,
+      focus: planned.blueprint.focus,
+      muscleGroups,
+      rotationWeek: planned.rotationWeek,
+      rotationDayIndex: planned.rotationDayIndex,
+      chipLabel,
+    }
   })
 }
 
