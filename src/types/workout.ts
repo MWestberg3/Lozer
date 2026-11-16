@@ -14,9 +14,11 @@ export type ThemeColorId =
   | 'blue'
   | 'purple'
 
+export type DaysPerWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7
+
 export interface GeneratorSettings {
   goal: TrainingGoal
-  daysPerWeek: 3 | 4 | 5
+  daysPerWeek: DaysPerWeek
 }
 
 export interface UserProfile {

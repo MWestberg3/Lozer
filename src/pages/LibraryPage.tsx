@@ -1,29 +1,13 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { ScrollableChipRow } from '../components/ScrollableChipRow'
 import { useApp } from '../context/AppContext'
 import { equipmentLabel, LIBRARY_EQUIPMENT_OPTIONS } from '../lib/equipment'
-import { getSessionsForUser } from '../storage/db'
-import { generateProgram, recentExerciseIdsFromSessions } from '../lib/workoutGenerator'
-import type { GeneratorSettings, TrainingGoal } from '../types/workout'
 
 export function LibraryPage() {
-  const {
-    state,
-    program,
-    catalog,
-    catalogLoading,
-    generatePlan,
-    saveGeneratorSettings,
-    dislikedExerciseIds,
-    isExerciseDisliked,
-    setExerciseDislikedPreference,
-  } = useApp()
-  const [settings, setSettings] = useState<GeneratorSettings>(state.generatorSettings)
+  const { catalog, dislikedExerciseIds, isExerciseDisliked, setExerciseDislikedPreference } = useApp()
   const [selectedEquipment, setSelectedEquipment] = useState<Set<string>>(() => new Set())
   const [selectedMuscles, setSelectedMuscles] = useState<Set<string>>(() => new Set())
   const [searchQuery, setSearchQuery] = useState('')
-  const [status, setStatus] = useState<string | null>(null)
 
   const toggleEquipment = (id: string) => {
     setSelectedEquipment((prev) => {
@@ -85,91 +69,10 @@ export function LibraryPage() {
     isExerciseDisliked,
   ])
 
-  const applySettings = (patch: Partial<GeneratorSettings>) => {
-    const next = { ...settings, ...patch }
-    setSettings(next)
-    saveGeneratorSettings(next)
-  }
-
-  const handleGenerate = () => {
-    const sessions = getSessionsForUser(state)
-    const recent = recentExerciseIdsFromSessions(sessions)
-    if (catalog.length === 0) {
-      setStatus('Exercise library is still loading.')
-      return
-    }
-    const nextProgram = generateProgram(
-      settings,
-      state.enabledLibraryEquipment,
-      recent,
-      catalog,
-      state.dislikedExerciseIds,
-      `regen-${Date.now()}`,
-    )
-    generatePlan(nextProgram)
-    setStatus('New plan ready — home and train tabs updated.')
-  }
-
   return (
     <section>
       <h1 className="page-title">Library</h1>
-      <p className="subtitle">Exercise catalog and auto-generated programs like Shred.</p>
-
-      <div className="card generator-panel">
-        <div className="generator-panel-title">Build my plan</div>
-        <p className="generator-panel-copy">
-          Lozer picks compounds first, respects your{' '}
-          <Link to="/settings">equipment settings</Link>, and swaps lifts you did recently. Weights still prefill from
-          your history when you train.
-        </p>
-
-        <label className="field-label">Goal</label>
-        <div className="chip-row">
-          {(['hypertrophy', 'strength'] as TrainingGoal[]).map((goal) => (
-            <button
-              key={goal}
-              type="button"
-              className={`chip ${settings.goal === goal ? 'active' : ''}`}
-              onClick={() => applySettings({ goal })}
-            >
-              {goal === 'hypertrophy' ? 'Muscle' : 'Strength'}
-            </button>
-          ))}
-        </div>
-
-        <label className="field-label">Days per week</label>
-        <div className="chip-row">
-          {([3, 4, 5] as const).map((days) => (
-            <button
-              key={days}
-              type="button"
-              className={`chip ${settings.daysPerWeek === days ? 'active' : ''}`}
-              onClick={() => applySettings({ daysPerWeek: days })}
-            >
-              {days} days
-            </button>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{ marginTop: '0.75rem' }}
-          onClick={handleGenerate}
-          disabled={catalogLoading}
-        >
-          {catalogLoading ? 'Loading library…' : 'Generate new program'}
-        </button>
-        {status && (
-          <p className="generator-status" role="status">
-            {status}
-          </p>
-        )}
-        <p className="generator-panel-copy" style={{ marginBottom: 0, marginTop: '0.75rem' }}>
-          Active: <strong>{program.name}</strong>
-          {program.generatedAt ? ` · updated ${new Date(program.generatedAt).toLocaleDateString()}` : ''}
-        </p>
-      </div>
+      <p className="subtitle">Browse exercises, block lifts, and search the catalog.</p>
 
       <h2 className="section-heading">
         Exercise library ({catalog.length}) · {dislikedExerciseIds.length} blocked

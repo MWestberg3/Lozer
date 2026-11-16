@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { AppSelect } from '../components/AppSelect'
 import { UserSwitcher } from '../components/UserSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
@@ -9,17 +10,33 @@ import {
   LIBRARY_EQUIPMENT_OPTIONS,
   type LibraryEquipmentId,
 } from '../lib/equipment'
-import { generateProgram, recentExerciseIdsFromSessions } from '../lib/workoutGenerator'
+import { clampDaysPerWeek, generateProgram, recentExerciseIdsFromSessions } from '../lib/workoutGenerator'
 import { THEME_COLOR_OPTIONS, type ThemeColorId } from '../lib/theme'
+import type { GeneratorSettings } from '../types/workout'
 
 export function SettingsPage() {
   const navigate = useNavigate()
   const { signOutUser } = useAuth()
-  const { state, catalog, catalogLoading, saveEquipmentPreferences, savePrimaryColor, generatePlan } = useApp()
+  const {
+    state,
+    program,
+    catalog,
+    catalogLoading,
+    saveEquipmentPreferences,
+    savePrimaryColor,
+    saveGeneratorSettings,
+    generatePlan,
+  } = useApp()
   const [selected, setSelected] = useState<Set<LibraryEquipmentId>>(
     () => new Set(state.enabledLibraryEquipment as LibraryEquipmentId[]),
   )
-  const [status, setStatus] = useState<string | null>(null)
+  const [generatorSettings, setGeneratorSettings] = useState<GeneratorSettings>(state.generatorSettings)
+  const [equipmentStatus, setEquipmentStatus] = useState<string | null>(null)
+  const [planStatus, setPlanStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    setGeneratorSettings(state.generatorSettings)
+  }, [state.generatorSettings])
 
   useEffect(() => {
     setSelected(new Set(state.enabledLibraryEquipment as LibraryEquipmentId[]))
@@ -37,18 +54,44 @@ export function SettingsPage() {
       else next.add(id)
       return next
     })
-    setStatus(null)
+    setEquipmentStatus(null)
+  }
+
+  const applyGeneratorSettings = (patch: Partial<GeneratorSettings>) => {
+    const next = { ...generatorSettings, ...patch }
+    setGeneratorSettings(next)
+    saveGeneratorSettings(next)
+    setPlanStatus(null)
+  }
+
+  const handleGenerate = () => {
+    const sessions = getSessionsForUser(state)
+    const recent = recentExerciseIdsFromSessions(sessions)
+    if (catalog.length === 0) {
+      setPlanStatus('Exercise library is still loading.')
+      return
+    }
+    const nextProgram = generateProgram(
+      generatorSettings,
+      state.enabledLibraryEquipment,
+      recent,
+      catalog,
+      state.dislikedExerciseIds,
+      `regen-${Date.now()}`,
+    )
+    generatePlan(nextProgram)
+    setPlanStatus('New plan ready — home updated.')
   }
 
   const handleSave = () => {
     if (selected.size === 0) {
-      setStatus('Pick at least one equipment type so we can build workouts.')
+      setEquipmentStatus('Pick at least one equipment type so we can build workouts.')
       return
     }
     const ids = sortedSelection
     saveEquipmentPreferences(ids)
     if (catalog.length === 0) {
-      setStatus('Equipment saved. Regenerate your plan from Library once the catalog finishes loading.')
+      setEquipmentStatus('Equipment saved. Generate a new program below once the catalog finishes loading.')
       return
     }
     const sessions = getSessionsForUser(state)
@@ -62,7 +105,7 @@ export function SettingsPage() {
       `gear-${Date.now()}`,
     )
     generatePlan(nextProgram)
-    setStatus('Equipment saved — your plan was rebuilt to match.')
+    setEquipmentStatus('Equipment saved — your plan was rebuilt to match.')
   }
 
   const switchAccount = async () => {
@@ -82,7 +125,44 @@ export function SettingsPage() {
       <h1 className="page-title">Settings</h1>
       <p className="subtitle">Tell Lozer what you actually have access to. The generator only picks exercises you can do.</p>
 
-      <div className="card">
+      <div className="card generator-panel">
+        <div className="generator-panel-title">Days per week</div>
+        <p className="generator-panel-copy">
+          Lozer picks compounds first, respects your equipment below, and swaps lifts you did recently. Weights still
+          prefill from your history when you train.
+        </p>
+        <AppSelect
+          id="days-per-week"
+          aria-label="Days per week"
+          value={generatorSettings.daysPerWeek}
+          options={([1, 2, 3, 4, 5, 6, 7] as const).map((days) => ({
+            value: days,
+            label: `${days} ${days === 1 ? 'day' : 'days'} per week`,
+          }))}
+          onChange={(days) => applyGeneratorSettings({ daysPerWeek: clampDaysPerWeek(days) })}
+        />
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ marginTop: '0.75rem' }}
+          onClick={handleGenerate}
+          disabled={catalogLoading}
+        >
+          {catalogLoading ? 'Loading library…' : 'Generate new program'}
+        </button>
+        {planStatus ? (
+          <p className="generator-status" role="status">
+            {planStatus}
+          </p>
+        ) : null}
+        {program.generatedAt ? (
+          <p className="generator-panel-copy" style={{ marginBottom: 0, marginTop: '0.75rem' }}>
+            updated {new Date(program.generatedAt).toLocaleDateString()}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="card" style={{ marginTop: '1rem' }}>
         <div className="generator-panel-title">Accent color</div>
         <div className="theme-color-grid">
           {THEME_COLOR_OPTIONS.map((option) => (
@@ -134,21 +214,13 @@ export function SettingsPage() {
           >
             Save &amp; rebuild plan
           </button>
-          {status ? (
+          {equipmentStatus ? (
             <p className="generator-status" role="status">
-              {status}
+              {equipmentStatus}
             </p>
           ) : null}
         </div>
       </details>
-
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <div className="generator-panel-title">Training preferences</div>
-        <p className="generator-panel-copy">
-          Goal, days per week, and program refresh live on the{' '}
-          <Link to="/library">Library</Link> tab.
-        </p>
-      </div>
     </section>
   )
 }

@@ -2,6 +2,7 @@ import { equipmentLabel, LIBRARY_EQUIPMENT_OPTIONS } from './equipment'
 import { equipmentMatchesUserGear } from './freeExerciseDb'
 import type {
   DayType,
+  DaysPerWeek,
   ExerciseTemplate,
   GeneratorSettings,
   LibraryExercise,
@@ -9,6 +10,12 @@ import type {
   TrainingGoal,
   WorkoutDayTemplate,
 } from '../types/workout'
+
+export function clampDaysPerWeek(value: number): DaysPerWeek {
+  const n = Math.round(value)
+  if (n >= 1 && n <= 7) return n as DaysPerWeek
+  return 4
+}
 
 export const defaultGeneratorSettings: GeneratorSettings = {
   goal: 'hypertrophy',
@@ -23,7 +30,48 @@ interface DayBlueprint {
   slots: { swapGroup?: string; compound?: boolean; muscle?: string; count?: number }[]
 }
 
-const BLUEPRINTS: Record<3 | 4 | 5, DayBlueprint[]> = {
+const BLUEPRINTS: Record<DaysPerWeek, DayBlueprint[]> = {
+  1: [
+    {
+      id: 'full',
+      name: 'Full body',
+      focus: 'Squat, push, pull, hinge',
+      type: 'full',
+      slots: [
+        { swapGroup: 'squat', compound: true },
+        { swapGroup: 'chest-compound', compound: true },
+        { swapGroup: 'horizontal-row', compound: true },
+        { swapGroup: 'hinge', compound: true },
+        { muscle: 'Shoulders', compound: false },
+      ],
+    },
+  ],
+  2: [
+    {
+      id: 'upper',
+      name: 'Upper',
+      focus: 'Chest, back, shoulders, arms',
+      type: 'upper',
+      slots: [
+        { swapGroup: 'chest-compound', compound: true },
+        { swapGroup: 'vertical-pull', compound: true },
+        { swapGroup: 'shoulder-press', compound: true },
+        { swapGroup: 'biceps' },
+      ],
+    },
+    {
+      id: 'lower',
+      name: 'Lower',
+      focus: 'Quads, hamstrings, glutes',
+      type: 'lower',
+      slots: [
+        { swapGroup: 'squat', compound: true },
+        { swapGroup: 'hinge', compound: true },
+        { muscle: 'Hamstrings' },
+        { muscle: 'Calves' },
+      ],
+    },
+  ],
   4: [
     {
       id: 'push',
@@ -167,6 +215,153 @@ const BLUEPRINTS: Record<3 | 4 | 5, DayBlueprint[]> = {
         { swapGroup: 'hinge', compound: true },
         { muscle: 'Hamstrings' },
         { muscle: 'Glutes' },
+      ],
+    },
+  ],
+  6: [
+    {
+      id: 'push',
+      name: 'Push',
+      focus: 'Chest, shoulders, triceps',
+      type: 'push',
+      slots: [
+        { swapGroup: 'chest-compound', compound: true },
+        { swapGroup: 'shoulder-press', compound: true },
+        { swapGroup: 'triceps' },
+      ],
+    },
+    {
+      id: 'pull',
+      name: 'Pull',
+      focus: 'Back and biceps',
+      type: 'pull',
+      slots: [
+        { swapGroup: 'hinge', compound: true },
+        { swapGroup: 'vertical-pull', compound: true },
+        { swapGroup: 'biceps' },
+      ],
+    },
+    {
+      id: 'legs',
+      name: 'Legs',
+      focus: 'Quad focus',
+      type: 'legs',
+      slots: [
+        { swapGroup: 'squat', compound: true },
+        { muscle: 'Hamstrings' },
+        { muscle: 'Calves' },
+      ],
+    },
+    {
+      id: 'upper',
+      name: 'Upper',
+      focus: 'Upper pump',
+      type: 'upper',
+      slots: [
+        { swapGroup: 'horizontal-row', compound: true },
+        { swapGroup: 'chest-compound', compound: true },
+        { swapGroup: 'biceps' },
+      ],
+    },
+    {
+      id: 'lower',
+      name: 'Lower',
+      focus: 'Posterior chain',
+      type: 'lower',
+      slots: [
+        { swapGroup: 'hinge', compound: true },
+        { muscle: 'Glutes' },
+        { muscle: 'Calves' },
+      ],
+    },
+    {
+      id: 'full',
+      name: 'Full body',
+      focus: 'Mixed compounds',
+      type: 'full',
+      slots: [
+        { swapGroup: 'squat', compound: true },
+        { swapGroup: 'vertical-pull', compound: true },
+        { muscle: 'Shoulders', compound: false },
+      ],
+    },
+  ],
+  7: [
+    {
+      id: 'push',
+      name: 'Push',
+      focus: 'Chest, shoulders, triceps',
+      type: 'push',
+      slots: [
+        { swapGroup: 'chest-compound', compound: true },
+        { swapGroup: 'shoulder-press', compound: true },
+        { swapGroup: 'triceps' },
+      ],
+    },
+    {
+      id: 'pull',
+      name: 'Pull',
+      focus: 'Back and biceps',
+      type: 'pull',
+      slots: [
+        { swapGroup: 'vertical-pull', compound: true },
+        { swapGroup: 'horizontal-row', compound: true },
+        { swapGroup: 'biceps' },
+      ],
+    },
+    {
+      id: 'legs',
+      name: 'Legs',
+      focus: 'Lower body',
+      type: 'legs',
+      slots: [
+        { swapGroup: 'squat', compound: true },
+        { swapGroup: 'hinge', compound: true },
+        { muscle: 'Calves' },
+      ],
+    },
+    {
+      id: 'push-b',
+      name: 'Push B',
+      focus: 'Chest & shoulders',
+      type: 'push',
+      slots: [
+        { swapGroup: 'chest-compound', compound: true },
+        { muscle: 'Chest', compound: false },
+        { swapGroup: 'triceps' },
+      ],
+    },
+    {
+      id: 'pull-b',
+      name: 'Pull B',
+      focus: 'Back focus',
+      type: 'pull',
+      slots: [
+        { swapGroup: 'hinge', compound: true },
+        { swapGroup: 'horizontal-row', compound: true },
+        { swapGroup: 'biceps' },
+      ],
+    },
+    {
+      id: 'legs-b',
+      name: 'Legs B',
+      focus: 'Legs & glutes',
+      type: 'legs',
+      slots: [
+        { swapGroup: 'squat', compound: true },
+        { muscle: 'Glutes' },
+        { muscle: 'Hamstrings' },
+      ],
+    },
+    {
+      id: 'upper',
+      name: 'Upper',
+      focus: 'Arms & shoulders',
+      type: 'upper',
+      slots: [
+        { swapGroup: 'shoulder-press', compound: true },
+        { swapGroup: 'biceps' },
+        { muscle: 'Shoulders', compound: false },
       ],
     },
   ],

@@ -1,7 +1,7 @@
 import { createDefaultProfile, defaultProgram } from '../data/defaultProgram'
 import { DEFAULT_ENABLED_LIBRARY_EQUIPMENT, enabledEquipmentFromLegacyPreset } from '../lib/equipment'
 import { DEFAULT_THEME_COLOR_ID, isThemeColorId } from '../lib/theme'
-import { defaultGeneratorSettings } from '../lib/workoutGenerator'
+import { clampDaysPerWeek, defaultGeneratorSettings } from '../lib/workoutGenerator'
 import { fetchRemoteAppState, writeRemoteAppState } from './firestoreAppState'
 import type { AppState, GeneratorSettings, Program, UserProfile, WorkoutSession } from '../types/workout'
 
@@ -42,7 +42,7 @@ export function migrateState(parsed: AppState, uid: string, displayName: string)
   const generatorSettings: GeneratorSettings = legacySettings
     ? {
         goal: legacySettings.goal ?? defaultGeneratorSettings.goal,
-        daysPerWeek: legacySettings.daysPerWeek ?? defaultGeneratorSettings.daysPerWeek,
+        daysPerWeek: clampDaysPerWeek(legacySettings.daysPerWeek ?? defaultGeneratorSettings.daysPerWeek),
       }
     : defaultGeneratorSettings
   let enabledLibraryEquipment = parsed.enabledLibraryEquipment

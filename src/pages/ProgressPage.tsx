@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { AppSelect } from '../components/AppSelect'
 import { useApp } from '../context/AppContext'
 import { getSessionsForUser } from '../storage/db'
 import { buildExerciseProgress } from '../lib/progress'
@@ -24,20 +25,19 @@ export function ProgressPage() {
       <h1 className="page-title">Progress</h1>
       <p className="subtitle">Heaviest set over time for {activeUser.displayName}</p>
 
-      <label style={{ display: 'block', marginBottom: '0.35rem', color: 'var(--muted)', fontSize: '0.85rem' }}>
+      <label className="field-label" htmlFor="progress-exercise">
         Exercise
       </label>
-      <select
-        className="field-select"
+      <AppSelect
+        id="progress-exercise"
+        aria-label="Exercise"
         value={exerciseId}
-        onChange={(e) => setExerciseId(e.target.value)}
-      >
-        {exercises.map((exercise) => (
-          <option key={exercise.id} value={exercise.id}>
-            {exercise.name} ({exercise.dayName})
-          </option>
-        ))}
-      </select>
+        options={exercises.map((exercise) => ({
+          value: exercise.id,
+          label: `${exercise.name} (${exercise.dayName})`,
+        }))}
+        onChange={setExerciseId}
+      />
 
       <div className="card">
         {selected && (
