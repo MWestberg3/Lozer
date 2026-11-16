@@ -47,6 +47,7 @@ export function buildDaySchedule(
   slotCount = 8,
   today = new Date(),
 ): DaySlot[] {
+  if (program.days.length === 0) return []
   const rotationStart = getNextRotationIndex(program, sessions)
   const latest = sessions[0]
   const slots: DaySlot[] = []

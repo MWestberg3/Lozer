@@ -5,20 +5,13 @@ import { ScrollableChipRow } from '../components/ScrollableChipRow'
 import { UserSwitcher } from '../components/UserSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
-import { getSessionsForUser } from '../storage/db'
 import {
   DEFAULT_ENABLED_LIBRARY_EQUIPMENT,
   equipmentLabel,
   LIBRARY_EQUIPMENT_OPTIONS,
   type LibraryEquipmentId,
 } from '../lib/equipment'
-import {
-  clampCustomRotationWeeks,
-  clampDaysPerWeek,
-  generateProgram,
-  normalizeGeneratorSettings,
-  recentExerciseIdsFromSessions,
-} from '../lib/workoutGenerator'
+import { clampCustomRotationWeeks, clampDaysPerWeek, normalizeGeneratorSettings } from '../lib/workoutGenerator'
 import { sortedMuscleGroupsFromCatalog } from '../lib/muscleRotation'
 import { THEME_COLOR_OPTIONS, type ThemeColorId } from '../lib/theme'
 import type { CustomRotationWeeks, GeneratorSettings, RotationMode } from '../types/workout'
@@ -28,13 +21,11 @@ export function SettingsPage() {
   const { signOutUser } = useAuth()
   const {
     state,
-    program,
     catalog,
     catalogLoading,
     saveEquipmentPreferences,
     savePrimaryColor,
     saveGeneratorSettings,
-    generatePlan,
     dislikedExerciseIds,
     setExerciseDislikedPreference,
   } = useApp()
@@ -43,7 +34,6 @@ export function SettingsPage() {
   )
   const [generatorSettings, setGeneratorSettings] = useState<GeneratorSettings>(state.generatorSettings)
   const [equipmentStatus, setEquipmentStatus] = useState<string | null>(null)
-  const [planStatus, setPlanStatus] = useState<string | null>(null)
 
   useEffect(() => {
     setGeneratorSettings(state.generatorSettings)
@@ -65,6 +55,11 @@ export function SettingsPage() {
     return catalog.filter((exercise) => blocked.has(exercise.id))
   }, [catalog, dislikedExerciseIds])
 
+  const activeThemeLabel = useMemo(
+    () => THEME_COLOR_OPTIONS.find((option) => option.id === state.primaryColorId)?.label ?? 'Orange',
+    [state.primaryColorId],
+  )
+
   const toggle = (id: LibraryEquipmentId) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -79,7 +74,6 @@ export function SettingsPage() {
     const next = normalizeGeneratorSettings(patch, generatorSettings, muscleGroups)
     setGeneratorSettings(next)
     saveGeneratorSettings(next)
-    setPlanStatus(null)
   }
 
   const customRotationMuscles =
@@ -101,48 +95,13 @@ export function SettingsPage() {
     applyGeneratorSettings({ customRotationMuscles: nextSlots })
   }
 
-  const handleGenerate = () => {
-    const sessions = getSessionsForUser(state)
-    const recent = recentExerciseIdsFromSessions(sessions)
-    if (catalog.length === 0) {
-      setPlanStatus('Exercise library is still loading.')
-      return
-    }
-    const nextProgram = generateProgram(
-      generatorSettings,
-      state.enabledLibraryEquipment,
-      recent,
-      catalog,
-      state.dislikedExerciseIds,
-      `regen-${Date.now()}`,
-    )
-    generatePlan(nextProgram)
-    setPlanStatus('New plan ready — home updated.')
-  }
-
   const handleSave = () => {
     if (selected.size === 0) {
       setEquipmentStatus('Pick at least one equipment type so we can build workouts.')
       return
     }
-    const ids = sortedSelection
-    saveEquipmentPreferences(ids)
-    if (catalog.length === 0) {
-      setEquipmentStatus('Equipment saved. Generate a new program below once the catalog finishes loading.')
-      return
-    }
-    const sessions = getSessionsForUser(state)
-    const recent = recentExerciseIdsFromSessions(sessions)
-    const nextProgram = generateProgram(
-      state.generatorSettings,
-      ids,
-      recent,
-      catalog,
-      state.dislikedExerciseIds,
-      `gear-${Date.now()}`,
-    )
-    generatePlan(nextProgram)
-    setEquipmentStatus('Equipment saved — your plan was rebuilt to match.')
+    saveEquipmentPreferences(sortedSelection)
+    setEquipmentStatus('Equipment saved.')
   }
 
   const switchAccount = async () => {
@@ -160,17 +119,43 @@ export function SettingsPage() {
       </header>
 
       <h1 className="page-title">Settings</h1>
-      <p className="subtitle">Tell Lozer what you actually have access to. The generator only picks exercises you can do.</p>
+      <p className="subtitle">Equipment, plan preferences, and blocked lifts. Changes save as you go.</p>
 
-      <details className="card settings-disclosure generator-panel">
+      <details className="card settings-disclosure">
+        <summary className="settings-disclosure-summary">
+          <span className="settings-disclosure-heading">
+            <span className="generator-panel-title">Accent color</span>
+            <span className="generator-panel-copy settings-disclosure-meta">{activeThemeLabel}</span>
+          </span>
+          <span className="settings-disclosure-chevron" aria-hidden />
+        </summary>
+        <div className="settings-disclosure-body">
+          <div className="theme-color-grid">
+            {THEME_COLOR_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`theme-swatch ${state.primaryColorId === option.id ? 'active' : ''}`}
+                onClick={() => savePrimaryColor(option.id as ThemeColorId)}
+                aria-pressed={state.primaryColorId === option.id}
+              >
+                <span className="theme-swatch-dot" style={{ background: option.accent }} aria-hidden />
+                <span className="theme-swatch-label">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </details>
+
+      <details className="card settings-disclosure generator-panel" style={{ marginTop: '1rem' }}>
         <summary className="settings-disclosure-summary">
           <span className="settings-disclosure-heading">
             <span className="generator-panel-title">Workout Plan</span>
             <span className="generator-panel-copy settings-disclosure-meta">
               {generatorSettings.daysPerWeek} {generatorSettings.daysPerWeek === 1 ? 'day' : 'days'} per week
               {generatorSettings.rotationMode === 'custom'
-                ? ` · ${generatorSettings.customRotationWeeks}-week custom rotation`
-                : ' · default rotation'}
+                ? ` · ${generatorSettings.customRotationWeeks}-week rotation`
+                : ' · same split each week'}
             </span>
           </span>
           <span className="settings-disclosure-chevron" aria-hidden />
@@ -178,8 +163,7 @@ export function SettingsPage() {
         <div className="settings-disclosure-body">
         <div className="generator-panel-title">Days per week</div>
         <p className="generator-panel-copy">
-          Lozer picks compounds first, respects your equipment below, and swaps lifts you did recently. Weights still
-          prefill from your history when you train.
+          How often you train and how your split rotates. Saved for your account—your home plan is not changed here.
         </p>
         <AppSelect
           id="days-per-week"
@@ -196,16 +180,16 @@ export function SettingsPage() {
           Rotation
         </div>
         <p className="generator-panel-copy">
-          Default repeats the same weekly split. Custom lets you vary each training slot across 1–3 weeks before the
-          pattern loops. Pick muscle groups from your library for each day (tap multiple pills, e.g. Chest + Triceps).
+          Same split every week, or map each slot across 1–3 weeks before the pattern repeats. Custom uses library
+          muscle groups per day (tap multiple pills, e.g. Chest + Triceps).
         </p>
         <AppSelect
           id="rotation-mode"
           aria-label="Rotation mode"
           value={generatorSettings.rotationMode}
           options={[
-            { value: 'default' as RotationMode, label: 'Default weekly rotation' },
-            { value: 'custom' as RotationMode, label: 'Custom multi-week rotation' },
+            { value: 'default' as RotationMode, label: 'Same split every week' },
+            { value: 'custom' as RotationMode, label: 'Multi-week rotation' },
           ]}
           onChange={(mode) => applyGeneratorSettings({ rotationMode: mode })}
         />
@@ -274,45 +258,8 @@ export function SettingsPage() {
             </div>
           </>
         ) : null}
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{ marginTop: '0.75rem' }}
-          onClick={handleGenerate}
-          disabled={catalogLoading}
-        >
-          {catalogLoading ? 'Loading library…' : 'Generate new program'}
-        </button>
-        {planStatus ? (
-          <p className="generator-status" role="status">
-            {planStatus}
-          </p>
-        ) : null}
-        {program.generatedAt ? (
-          <p className="generator-panel-copy" style={{ marginBottom: 0, marginTop: '0.75rem' }}>
-            updated {new Date(program.generatedAt).toLocaleDateString()}
-          </p>
-        ) : null}
         </div>
       </details>
-
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <div className="generator-panel-title">Accent color</div>
-        <div className="theme-color-grid">
-          {THEME_COLOR_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className={`theme-swatch ${state.primaryColorId === option.id ? 'active' : ''}`}
-              onClick={() => savePrimaryColor(option.id as ThemeColorId)}
-              aria-pressed={state.primaryColorId === option.id}
-            >
-              <span className="theme-swatch-dot" style={{ background: option.accent }} aria-hidden />
-              <span className="theme-swatch-label">{option.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       <details className="card settings-disclosure" style={{ marginTop: '1rem' }}>
         <summary className="settings-disclosure-summary">
@@ -346,7 +293,7 @@ export function SettingsPage() {
             onClick={handleSave}
             disabled={catalogLoading}
           >
-            Save &amp; rebuild plan
+            Save
           </button>
           {equipmentStatus ? (
             <p className="generator-status" role="status">

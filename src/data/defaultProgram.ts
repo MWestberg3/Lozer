@@ -1,10 +1,10 @@
 import type { Program, UserProfile } from '../types/workout'
 
-/** Replaced when the free-exercise-db catalog finishes loading. */
+/** Empty until the user generates a plan in Settings. */
 export const defaultProgram: Program = {
-  id: 'pending-catalog',
-  name: 'Your plan',
-  description: 'Loading exercise library…',
+  id: 'empty-plan',
+  name: 'No plan yet',
+  description: 'Plan preferences are in Settings.',
   daysPerWeek: 4,
   days: [],
 }

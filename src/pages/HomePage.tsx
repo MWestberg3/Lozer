@@ -10,6 +10,7 @@ export function HomePage() {
   const latest = sessions[0]
   const today = new Date()
   const schedule = buildDaySchedule(program, sessions)
+  const hasPlan = program.days.length > 0
   const todaySlot = schedule[0]
 
   return (
@@ -18,22 +19,36 @@ export function HomePage() {
       <h1 className="page-title">Lozer</h1>
       <p className="subtitle">Training plan for {activeUser.displayName}</p>
 
-      <div className={`card today-workout ${todaySlot.completedToday ? 'is-complete' : ''}`}>
-        <div className="today-workout-badge">{todaySlot.completedToday ? 'Completed' : 'Today'}</div>
-        <strong className="today-workout-name">{todaySlot.day.name}</strong>
-        <p className="today-workout-focus">{todaySlot.day.focus}</p>
-        <p className="today-workout-meta">
-          {todaySlot.day.exercises.length} exercises · {program.name}
-        </p>
-        <Link
-          to={`/workout/preview?day=${encodeURIComponent(todaySlot.day.id)}`}
-          className="btn btn-primary"
-        >
-          Preview workout
-        </Link>
-      </div>
+      {hasPlan && todaySlot ? (
+        <>
+          <div className={`card today-workout ${todaySlot.completedToday ? 'is-complete' : ''}`}>
+            <div className="today-workout-badge">{todaySlot.completedToday ? 'Completed' : 'Today'}</div>
+            <strong className="today-workout-name">{todaySlot.day.name}</strong>
+            <p className="today-workout-focus">{todaySlot.day.focus}</p>
+            <p className="today-workout-meta">
+              {todaySlot.day.exercises.length} exercises · {program.name}
+            </p>
+            <Link
+              to={`/workout/preview?day=${encodeURIComponent(todaySlot.day.id)}`}
+              className="btn btn-primary"
+            >
+              Preview workout
+            </Link>
+          </div>
 
-      <WorkoutDayCarousel slots={schedule} />
+          <WorkoutDayCarousel slots={schedule} />
+        </>
+      ) : (
+        <div className="card" style={{ marginTop: '0.5rem' }}>
+          <strong>No workout plan yet</strong>
+          <p className="generator-panel-copy" style={{ marginTop: '0.35rem' }}>
+            Your plan will show here once workouts are set up. Adjust plan preferences in Settings anytime.
+          </p>
+          <Link to="/settings" className="btn btn-primary" style={{ marginTop: '0.75rem' }}>
+            Plan preferences
+          </Link>
+        </div>
+      )}
 
       <div className="stat-grid" style={{ marginTop: '1rem' }}>
         <div className="stat">

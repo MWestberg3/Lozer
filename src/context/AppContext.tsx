@@ -20,11 +20,6 @@ import {
   updateUserProfile,
 } from '../storage/db'
 import { fetchExerciseCatalog } from '../data/exerciseLibrary'
-import {
-  generateProgram,
-  recentExerciseIdsFromSessions,
-  scrubDislikedFromProgram,
-} from '../lib/workoutGenerator'
 import type {
   AppState,
   GeneratorSettings,
@@ -98,22 +93,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  useEffect(() => {
-    if (!uid || !state || catalog.length === 0) return
-    const program = getProgramForUser(state)
-    const needsPlan = program.days.length === 0 || program.id === 'pending-catalog'
-    if (!needsPlan) return
-    const recent = recentExerciseIdsFromSessions(state.sessions)
-    const generated = generateProgram(
-      state.generatorSettings,
-      state.enabledLibraryEquipment,
-      recent,
-      catalog,
-      state.dislikedExerciseIds,
-    )
-    setState((prev) => (prev ? applyProgram(uid, prev, generated) : prev))
-  }, [uid, state, catalog])
-
   const activeUser = state?.profile
   const program = state ? getProgramForUser(state) : undefined
 
@@ -167,24 +146,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setExerciseDislikedPreference = useCallback(
     (exerciseId: string, disliked: boolean) => {
-      if (!uid || !state || catalog.length === 0) return
-      setState((prev) => {
-        if (!prev) return prev
-        const withPref = setExerciseDisliked(uid, prev, exerciseId, disliked)
-        if (!disliked) return withPref
-        const recent = recentExerciseIdsFromSessions(withPref.sessions)
-        const scrubbed = scrubDislikedFromProgram(
-          getProgramForUser(withPref),
-          withPref.dislikedExerciseIds,
-          withPref.generatorSettings,
-          withPref.enabledLibraryEquipment,
-          recent,
-          catalog,
-        )
-        return applyProgram(uid, withPref, scrubbed)
-      })
+      if (!uid || !state) return
+      setState((prev) => (prev ? setExerciseDisliked(uid, prev, exerciseId, disliked) : prev))
     },
-    [uid, state, catalog],
+    [uid, state],
   )
 
   const isExerciseDisliked = useCallback(
