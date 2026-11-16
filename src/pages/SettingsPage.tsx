@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../components/AppSelect'
+import { ScrollableChipRow } from '../components/ScrollableChipRow'
 import { UserSwitcher } from '../components/UserSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
@@ -10,9 +11,16 @@ import {
   LIBRARY_EQUIPMENT_OPTIONS,
   type LibraryEquipmentId,
 } from '../lib/equipment'
-import { clampDaysPerWeek, generateProgram, recentExerciseIdsFromSessions } from '../lib/workoutGenerator'
+import {
+  clampCustomRotationWeeks,
+  clampDaysPerWeek,
+  generateProgram,
+  normalizeGeneratorSettings,
+  recentExerciseIdsFromSessions,
+} from '../lib/workoutGenerator'
+import { sortedMuscleGroupsFromCatalog } from '../lib/muscleRotation'
 import { THEME_COLOR_OPTIONS, type ThemeColorId } from '../lib/theme'
-import type { GeneratorSettings } from '../types/workout'
+import type { CustomRotationWeeks, GeneratorSettings, RotationMode } from '../types/workout'
 
 export function SettingsPage() {
   const navigate = useNavigate()
@@ -47,6 +55,8 @@ export function SettingsPage() {
     return [...selected].sort((a, b) => order.indexOf(a) - order.indexOf(b))
   }, [selected])
 
+  const muscleGroups = useMemo(() => sortedMuscleGroupsFromCatalog(catalog), [catalog])
+
   const toggle = (id: LibraryEquipmentId) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -58,10 +68,29 @@ export function SettingsPage() {
   }
 
   const applyGeneratorSettings = (patch: Partial<GeneratorSettings>) => {
-    const next = { ...generatorSettings, ...patch }
+    const next = normalizeGeneratorSettings(patch, generatorSettings, muscleGroups)
     setGeneratorSettings(next)
     saveGeneratorSettings(next)
     setPlanStatus(null)
+  }
+
+  const customRotationMuscles =
+    generatorSettings.rotationMode === 'custom' ? (generatorSettings.customRotationMuscles ?? []) : []
+
+  const toggleCustomSlotMuscle = (slotIndex: number, muscle: string) => {
+    const nextSlots = customRotationMuscles.map((groups, index) => {
+      if (index !== slotIndex) return [...groups]
+      const set = new Set(groups)
+      if (set.has(muscle)) set.delete(muscle)
+      else set.add(muscle)
+      return [...set].sort((a, b) => a.localeCompare(b))
+    })
+    applyGeneratorSettings({ customRotationMuscles: nextSlots })
+  }
+
+  const clearCustomSlotMuscles = (slotIndex: number) => {
+    const nextSlots = customRotationMuscles.map((groups, index) => (index === slotIndex ? [] : [...groups]))
+    applyGeneratorSettings({ customRotationMuscles: nextSlots })
   }
 
   const handleGenerate = () => {
@@ -141,6 +170,89 @@ export function SettingsPage() {
           }))}
           onChange={(days) => applyGeneratorSettings({ daysPerWeek: clampDaysPerWeek(days) })}
         />
+
+        <div className="generator-panel-title" style={{ marginTop: '1rem' }}>
+          Rotation
+        </div>
+        <p className="generator-panel-copy">
+          Default repeats the same weekly split. Custom lets you vary each training slot across 1–3 weeks before the
+          pattern loops. Pick muscle groups from your library for each day (tap multiple pills, e.g. Chest + Triceps).
+        </p>
+        <AppSelect
+          id="rotation-mode"
+          aria-label="Rotation mode"
+          value={generatorSettings.rotationMode}
+          options={[
+            { value: 'default' as RotationMode, label: 'Default weekly rotation' },
+            { value: 'custom' as RotationMode, label: 'Custom multi-week rotation' },
+          ]}
+          onChange={(mode) => applyGeneratorSettings({ rotationMode: mode })}
+        />
+
+        {generatorSettings.rotationMode === 'custom' ? (
+          <>
+            <AppSelect
+              id="rotation-weeks"
+              aria-label="Rotation cycle length in weeks"
+              value={generatorSettings.customRotationWeeks}
+              options={([1, 2, 3] as const).map((weeks) => ({
+                value: weeks as CustomRotationWeeks,
+                label: `${weeks} ${weeks === 1 ? 'week' : 'weeks'} before repeat`,
+              }))}
+              onChange={(weeks) => applyGeneratorSettings({ customRotationWeeks: clampCustomRotationWeeks(weeks) })}
+              className="rotation-weeks-select"
+            />
+
+            <div className="rotation-slots-grid" role="group" aria-label="Custom rotation by week and day">
+              {Array.from({ length: generatorSettings.customRotationWeeks }, (_, weekIndex) => (
+                <section key={`rotation-week-${weekIndex + 1}`} className="rotation-week-block">
+                  <h3 className="rotation-week-label">Week {weekIndex + 1}</h3>
+                  {Array.from({ length: generatorSettings.daysPerWeek }, (_, dayIndex) => {
+                    const slotIndex = weekIndex * generatorSettings.daysPerWeek + dayIndex
+                    const slotMuscles = new Set(customRotationMuscles[slotIndex] ?? [])
+                    return (
+                      <div
+                        key={`rotation-slot-${slotIndex}`}
+                        className="rotation-slot-row"
+                        role="group"
+                        aria-label={`Week ${weekIndex + 1} day ${dayIndex + 1} muscle groups`}
+                      >
+                        <div className="rotation-slot-header">
+                          <span className="rotation-slot-label">Day {dayIndex + 1}</span>
+                          <button
+                            type="button"
+                            className="rotation-slot-clear"
+                            disabled={slotMuscles.size === 0}
+                            onClick={() => clearCustomSlotMuscles(slotIndex)}
+                          >
+                            Deselect all
+                          </button>
+                        </div>
+                        <ScrollableChipRow>
+                          {muscleGroups.map((muscle) => {
+                            const selected = slotMuscles.has(muscle)
+                            return (
+                              <button
+                                key={muscle}
+                                type="button"
+                                className={`chip ${selected ? 'active' : ''}`}
+                                aria-pressed={selected}
+                                disabled={catalogLoading || muscleGroups.length === 0}
+                                onClick={() => toggleCustomSlotMuscle(slotIndex, muscle)}
+                              >
+                                {muscle}
+                              </button>
+                            )
+                          })}
+                        </ScrollableChipRow>
+                      </div>
+                    )
+                  })}
+                </section>
+              ))}
+            </div>
+          </>
+        ) : null}
         <button
           type="button"
           className="btn btn-primary"

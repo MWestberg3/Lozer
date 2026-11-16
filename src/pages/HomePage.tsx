@@ -51,7 +51,11 @@ export function HomePage() {
         </div>
         <div className="stat">
           <strong>{program.days.length}</strong>
-          <span>Day split</span>
+          <span>
+            {program.rotationCycleWeeks && program.rotationCycleWeeks > 1
+              ? `${program.daysPerWeek}-day · ${program.rotationCycleWeeks} wk cycle`
+              : 'Day split'}
+          </span>
         </div>
       </div>
 

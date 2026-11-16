@@ -16,9 +16,16 @@ export type ThemeColorId =
 
 export type DaysPerWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
+export type RotationMode = 'default' | 'custom'
+export type CustomRotationWeeks = 1 | 2 | 3
+
 export interface GeneratorSettings {
   goal: TrainingGoal
   daysPerWeek: DaysPerWeek
+  rotationMode: RotationMode
+  customRotationWeeks: CustomRotationWeeks
+  /** Week-major order: week 1 days 1…N, week 2 days 1…N, etc. Used when rotationMode is custom. */
+  customRotationMuscles?: string[][]
 }
 
 export interface UserProfile {
@@ -62,6 +69,9 @@ export interface WorkoutDayTemplate {
   name: string
   focus: string
   exercises: ExerciseTemplate[]
+  rotationMuscleGroups?: string[]
+  rotationWeek?: number
+  rotationDayIndex?: number
 }
 
 export interface Program {
@@ -71,6 +81,8 @@ export interface Program {
   daysPerWeek: number
   days: WorkoutDayTemplate[]
   generatedAt?: string
+  /** Calendar rotation length in “weeks” of unique training days (1 = standard weekly split). */
+  rotationCycleWeeks?: number
 }
 
 export interface SetLog {

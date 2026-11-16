@@ -1,12 +1,15 @@
 import { equipmentLabel, LIBRARY_EQUIPMENT_OPTIONS } from './equipment'
 import { equipmentMatchesUserGear } from './freeExerciseDb'
+import { blueprintFromMuscleGroups, normalizeCustomRotationMuscles } from './muscleRotation'
 import type {
+  CustomRotationWeeks,
   DayType,
   DaysPerWeek,
   ExerciseTemplate,
   GeneratorSettings,
   LibraryExercise,
   Program,
+  RotationMode,
   TrainingGoal,
   WorkoutDayTemplate,
 } from '../types/workout'
@@ -20,6 +23,92 @@ export function clampDaysPerWeek(value: number): DaysPerWeek {
 export const defaultGeneratorSettings: GeneratorSettings = {
   goal: 'hypertrophy',
   daysPerWeek: 4,
+  rotationMode: 'default',
+  customRotationWeeks: 1,
+}
+
+export function clampCustomRotationWeeks(value: number): CustomRotationWeeks {
+  const n = Math.round(value)
+  if (n >= 1 && n <= 3) return n as CustomRotationWeeks
+  return 1
+}
+
+export function normalizeGeneratorSettings(
+  patch: Partial<GeneratorSettings>,
+  prev: GeneratorSettings,
+  knownMuscles?: Iterable<string>,
+): GeneratorSettings {
+  const known = knownMuscles ? new Set(knownMuscles) : new Set<string>()
+  const merged: GeneratorSettings = {
+    ...prev,
+    ...patch,
+    daysPerWeek: clampDaysPerWeek(patch.daysPerWeek ?? prev.daysPerWeek),
+    rotationMode: (patch.rotationMode ?? prev.rotationMode ?? 'default') as RotationMode,
+    customRotationWeeks: clampCustomRotationWeeks(
+      patch.customRotationWeeks ?? prev.customRotationWeeks ?? 1,
+    ),
+  }
+  if (merged.rotationMode === 'custom') {
+    merged.customRotationMuscles = normalizeCustomRotationMuscles(merged, known)
+  }
+  return merged
+}
+
+interface PlannedDay {
+  blueprint: DayBlueprint
+  rotationMuscleGroups: string[]
+  rotationWeek: number
+  rotationDayIndex: number
+}
+
+function planDays(settings: GeneratorSettings, catalog: LibraryExercise[]): PlannedDay[] {
+  if (settings.rotationMode !== 'custom') {
+    return BLUEPRINTS[settings.daysPerWeek].map((blueprint, rotationDayIndex) => ({
+      blueprint,
+      rotationMuscleGroups: [],
+      rotationWeek: 1,
+      rotationDayIndex,
+    }))
+  }
+
+  const known = new Set(catalog.map((exercise) => exercise.muscleGroup))
+  const slotMuscles = normalizeCustomRotationMuscles(settings, known)
+  const weeks = settings.customRotationWeeks
+  return slotMuscles.map((muscleGroups, index) => {
+    const rotationWeek = Math.floor(index / settings.daysPerWeek) + 1
+    const rotationDayIndex = index % settings.daysPerWeek
+    const dayKey = `w${rotationWeek}-d${rotationDayIndex + 1}`
+    const built = blueprintFromMuscleGroups(muscleGroups, dayKey)
+    const blueprint: DayBlueprint = {
+      id: dayKey,
+      name: weeks > 1 ? `${built.name} · W${rotationWeek}` : built.name,
+      focus: built.focus,
+      type: built.type,
+      slots: built.slots,
+    }
+    return { blueprint, rotationMuscleGroups: muscleGroups, rotationWeek, rotationDayIndex }
+  })
+}
+
+function blueprintForDay(
+  program: Program,
+  dayId: string,
+  settings: GeneratorSettings,
+): DayBlueprint | null {
+  const existing = program.days.find((d) => d.id === dayId)
+  if (existing?.rotationMuscleGroups?.length) {
+    const built = blueprintFromMuscleGroups(existing.rotationMuscleGroups, existing.id, existing.name)
+    return {
+      id: existing.id,
+      name: existing.name,
+      focus: built.focus,
+      type: built.type,
+      slots: built.slots,
+    }
+  }
+  const fromWeekly = BLUEPRINTS[settings.daysPerWeek].find((d) => d.id === dayId)
+  if (fromWeekly) return fromWeekly
+  return null
 }
 
 interface DayBlueprint {
@@ -470,6 +559,32 @@ function buildDay(
   }
 }
 
+function buildDayFromPlan(
+  plan: PlannedDay,
+  settings: GeneratorSettings,
+  enabledLibraryEquipment: string[],
+  recentExerciseIds: string[],
+  dislikedExerciseIds: string[],
+  variationSeed: string,
+  catalog: LibraryExercise[],
+): WorkoutDayTemplate {
+  const day = buildDay(
+    plan.blueprint,
+    settings,
+    enabledLibraryEquipment,
+    recentExerciseIds,
+    dislikedExerciseIds,
+    variationSeed,
+    catalog,
+  )
+  return {
+    ...day,
+    rotationMuscleGroups: plan.rotationMuscleGroups,
+    rotationWeek: plan.rotationWeek,
+    rotationDayIndex: plan.rotationDayIndex,
+  }
+}
+
 export function generateProgram(
   settings: GeneratorSettings,
   enabledLibraryEquipment: string[],
@@ -481,27 +596,34 @@ export function generateProgram(
   if (catalog.length === 0) {
     throw new Error('Exercise catalog not loaded')
   }
-  const blueprint = BLUEPRINTS[settings.daysPerWeek]
+  const dayPlans = planDays(settings, catalog)
   const goalLabel = settings.goal === 'strength' ? 'Strength' : 'Hypertrophy'
   const gearSummary =
     enabledLibraryEquipment.length >= LIBRARY_EQUIPMENT_OPTIONS.length
       ? 'your full equipment list'
       : enabledLibraryEquipment.map((id) => equipmentLabel(id).toLowerCase()).join(', ') || 'your equipment'
+  const rotationCycleWeeks =
+    settings.rotationMode === 'custom' ? settings.customRotationWeeks : 1
+  const rotationNote =
+    settings.rotationMode === 'custom' && rotationCycleWeeks > 1
+      ? ` ${rotationCycleWeeks}-week rotation.`
+      : ''
 
   return {
     id: `generated-${settings.daysPerWeek}-${settings.goal}-${Date.now()}`,
-    name: `${goalLabel} · ${settings.daysPerWeek}-day`,
-    description: `Auto-built ${settings.daysPerWeek}-day ${settings.goal} split for ${gearSummary}. Refresh to swap exercises and keep progressive overload from your logs.`,
+    name: `${goalLabel} · ${settings.daysPerWeek}-day${rotationCycleWeeks > 1 ? ` · ${rotationCycleWeeks} wk` : ''}`,
+    description: `Auto-built ${settings.daysPerWeek}-day ${settings.goal} split for ${gearSummary}.${rotationNote} Refresh to swap exercises and keep progressive overload from your logs.`,
     daysPerWeek: settings.daysPerWeek,
+    rotationCycleWeeks,
     generatedAt: new Date().toISOString(),
-    days: blueprint.map((day) =>
-      buildDay(
-        day,
+    days: dayPlans.map((plan) =>
+      buildDayFromPlan(
+        plan,
         settings,
         enabledLibraryEquipment,
         recentExerciseIds,
         dislikedExerciseIds,
-        `${variationSeed}-${day.id}`,
+        `${variationSeed}-${plan.blueprint.id}`,
         catalog,
       ),
     ),
@@ -518,17 +640,23 @@ export function regenerateDay(
   dislikedExerciseIds: string[] = [],
   variationSeed = `${Date.now()}`,
 ): Program {
-  const blueprint = BLUEPRINTS[settings.daysPerWeek].find((d) => d.id === dayId)
+  const existing = program.days.find((d) => d.id === dayId)
+  const blueprint = blueprintForDay(program, dayId, settings)
   if (!blueprint || catalog.length === 0) return program
-  const nextDay = buildDay(
-    blueprint,
-    settings,
-    enabledLibraryEquipment,
-    recentExerciseIds,
-    dislikedExerciseIds,
-    variationSeed,
-    catalog,
-  )
+  const nextDay: WorkoutDayTemplate = {
+    ...buildDay(
+      blueprint,
+      settings,
+      enabledLibraryEquipment,
+      recentExerciseIds,
+      dislikedExerciseIds,
+      variationSeed,
+      catalog,
+    ),
+    rotationMuscleGroups: existing?.rotationMuscleGroups,
+    rotationWeek: existing?.rotationWeek,
+    rotationDayIndex: existing?.rotationDayIndex,
+  }
   return {
     ...program,
     days: program.days.map((day) => (day.id === dayId ? nextDay : day)),
