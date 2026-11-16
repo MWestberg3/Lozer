@@ -321,7 +321,7 @@ select option {
   flex-shrink: 0;
 }
 
-.generator-panel > .app-select {
+.generator-panel .settings-disclosure-body > .app-select {
   margin-top: 1rem;
 }
 
@@ -912,7 +912,7 @@ select option {
   line-height: 1.5;
 }
 
-.generator-panel > .generator-panel-copy:first-of-type {
+.generator-panel .settings-disclosure-body > .generator-panel-copy:first-of-type {
   margin-bottom: 0.15rem;
 }
 

@@ -154,7 +154,20 @@ export function SettingsPage() {
       <h1 className="page-title">Settings</h1>
       <p className="subtitle">Tell Lozer what you actually have access to. The generator only picks exercises you can do.</p>
 
-      <div className="card generator-panel">
+      <details className="card settings-disclosure generator-panel">
+        <summary className="settings-disclosure-summary">
+          <span className="settings-disclosure-heading">
+            <span className="generator-panel-title">Workout Plan</span>
+            <span className="generator-panel-copy settings-disclosure-meta">
+              {generatorSettings.daysPerWeek} {generatorSettings.daysPerWeek === 1 ? 'day' : 'days'} per week
+              {generatorSettings.rotationMode === 'custom'
+                ? ` · ${generatorSettings.customRotationWeeks}-week custom rotation`
+                : ' · default rotation'}
+            </span>
+          </span>
+          <span className="settings-disclosure-chevron" aria-hidden />
+        </summary>
+        <div className="settings-disclosure-body">
         <div className="generator-panel-title">Days per week</div>
         <p className="generator-panel-copy">
           Lozer picks compounds first, respects your equipment below, and swaps lifts you did recently. Weights still
@@ -272,7 +285,8 @@ export function SettingsPage() {
             updated {new Date(program.generatedAt).toLocaleDateString()}
           </p>
         ) : null}
-      </div>
+        </div>
+      </details>
 
       <div className="card" style={{ marginTop: '1rem' }}>
         <div className="generator-panel-title">Accent color</div>
