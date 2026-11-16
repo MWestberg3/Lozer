@@ -110,7 +110,8 @@ const DEFAULT_WEEK_MUSCLES: Record<DaysPerWeek, string[][]> = {
   ],
 }
 
-function slotCount(settings: GeneratorSettings): number {
+export function rotationSlotCount(settings: GeneratorSettings): number {
+  if (settings.rotationMode === 'default') return settings.daysPerWeek
   return settings.daysPerWeek * settings.customRotationWeeks
 }
 
@@ -120,7 +121,7 @@ export function defaultMuscleGroupsForDayIndex(daysPerWeek: DaysPerWeek, dayInde
 }
 
 export function defaultCustomRotationMuscles(settings: GeneratorSettings): string[][] {
-  const total = slotCount(settings)
+  const total = rotationSlotCount(settings)
   const result: string[][] = []
   for (let i = 0; i < total; i++) {
     const dayIndex = i % settings.daysPerWeek
@@ -133,20 +134,40 @@ function isKnownMuscle(muscle: string, known: Set<string>): boolean {
   return known.has(muscle)
 }
 
+/** True when every slot still matches the old built-in split presets (never user-picked). */
+export function isLegacyAutoMuscleSplit(settings: GeneratorSettings): boolean {
+  const saved = settings.customRotationMuscles
+  if (!saved?.length || !saved.some((groups) => groups.length > 0)) return false
+  const slots = rotationSlotCount(settings)
+  for (let i = 0; i < slots; i++) {
+    const dayIndex = i % settings.daysPerWeek
+    const expected = defaultMuscleGroupsForDayIndex(settings.daysPerWeek, dayIndex)
+    const actual = saved[i] ?? []
+    const a = [...actual].sort().join('\0')
+    const b = [...expected].sort().join('\0')
+    if (a !== b) return false
+  }
+  return true
+}
+
+export function stripLegacyAutoMuscleSplit(settings: GeneratorSettings): GeneratorSettings {
+  if (!isLegacyAutoMuscleSplit(settings)) return settings
+  const { customRotationMuscles: _removed, ...rest } = settings
+  return rest
+}
+
 export function normalizeCustomRotationMuscles(
   settings: GeneratorSettings,
   knownMuscles: Set<string> = new Set(),
 ): string[][] {
-  const count = slotCount(settings)
-  const defaults = defaultCustomRotationMuscles(settings)
+  const count = rotationSlotCount(settings)
   const existing = settings.customRotationMuscles ?? []
   const next: string[][] = []
 
   for (let i = 0; i < count; i++) {
-    const fallback = defaults[i] ?? defaults[0] ?? ['Chest']
     const raw = existing[i]
     if (raw === undefined) {
-      next.push(fallback)
+      next.push([])
       continue
     }
     if (raw.length === 0) {

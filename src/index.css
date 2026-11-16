@@ -141,6 +141,18 @@ button {
   width: 100%;
 }
 
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.btn-primary:disabled {
+  background: var(--surface-2);
+  color: color-mix(in srgb, var(--muted) 85%, #fff);
+  border: 1px solid var(--border);
+}
+
 .btn-ghost {
   background: var(--surface-2);
   color: #fff;

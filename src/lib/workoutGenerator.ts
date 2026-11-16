@@ -1,10 +1,6 @@
 import { equipmentLabel, LIBRARY_EQUIPMENT_OPTIONS } from './equipment'
 import { equipmentMatchesUserGear } from './freeExerciseDb'
-import {
-  blueprintFromMuscleGroups,
-  defaultMuscleGroupsForDayIndex,
-  normalizeCustomRotationMuscles,
-} from './muscleRotation'
+import { blueprintFromMuscleGroups, normalizeCustomRotationMuscles } from './muscleRotation'
 import type {
   CustomRotationWeeks,
   DayType,
@@ -52,9 +48,7 @@ export function normalizeGeneratorSettings(
       patch.customRotationWeeks ?? prev.customRotationWeeks ?? 1,
     ),
   }
-  if (merged.rotationMode === 'custom') {
-    merged.customRotationMuscles = normalizeCustomRotationMuscles(merged, known)
-  }
+  merged.customRotationMuscles = normalizeCustomRotationMuscles(merged, known)
   return merged
 }
 
@@ -66,26 +60,17 @@ interface PlannedDay {
 }
 
 function planDays(settings: GeneratorSettings, catalog: LibraryExercise[]): PlannedDay[] {
-  if (settings.rotationMode !== 'custom') {
-    return BLUEPRINTS[settings.daysPerWeek].map((blueprint, rotationDayIndex) => ({
-      blueprint,
-      rotationMuscleGroups: [],
-      rotationWeek: 1,
-      rotationDayIndex,
-    }))
-  }
-
   const known = new Set(catalog.map((exercise) => exercise.muscleGroup))
   const slotMuscles = normalizeCustomRotationMuscles(settings, known)
-  const weeks = settings.customRotationWeeks
+  const multiWeek = settings.rotationMode === 'custom' && settings.customRotationWeeks > 1
   return slotMuscles.map((muscleGroups, index) => {
     const rotationWeek = Math.floor(index / settings.daysPerWeek) + 1
     const rotationDayIndex = index % settings.daysPerWeek
-    const dayKey = `w${rotationWeek}-d${rotationDayIndex + 1}`
+    const dayKey = multiWeek ? `w${rotationWeek}-d${rotationDayIndex + 1}` : `day-${rotationDayIndex + 1}`
     const built = blueprintFromMuscleGroups(muscleGroups, dayKey)
     const blueprint: DayBlueprint = {
       id: dayKey,
-      name: weeks > 1 ? `${built.name} · W${rotationWeek}` : built.name,
+      name: multiWeek ? `${built.name} · W${rotationWeek}` : built.name,
       focus: built.focus,
       type: built.type,
       slots: built.slots,
@@ -106,9 +91,7 @@ export interface PlanSlotInfo {
 
 export function listPlanSlots(settings: GeneratorSettings, catalog: LibraryExercise[]): PlanSlotInfo[] {
   return planDays(settings, catalog).map((planned) => {
-    const muscleGroups = planned.rotationMuscleGroups.length
-      ? planned.rotationMuscleGroups
-      : defaultMuscleGroupsForDayIndex(settings.daysPerWeek, planned.rotationDayIndex)
+    const muscleGroups = planned.rotationMuscleGroups
     const multiWeek = settings.rotationMode === 'custom' && settings.customRotationWeeks > 1
     const chipLabel = multiWeek
       ? `W${planned.rotationWeek} D${planned.rotationDayIndex + 1}`

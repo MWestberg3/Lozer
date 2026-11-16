@@ -24,7 +24,7 @@ export interface GeneratorSettings {
   daysPerWeek: DaysPerWeek
   rotationMode: RotationMode
   customRotationWeeks: CustomRotationWeeks
-  /** Week-major order: week 1 days 1…N, week 2 days 1…N, etc. Used when rotationMode is custom. */
+  /** Week-major order: week 1 days 1…N, week 2 days 1…N, etc. Muscle focus per training slot (all rotation modes). */
   customRotationMuscles?: string[][]
 }
 
