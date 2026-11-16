@@ -34,6 +34,7 @@ export function SettingsPage() {
   )
   const [generatorSettings, setGeneratorSettings] = useState<GeneratorSettings>(state.generatorSettings)
   const [equipmentStatus, setEquipmentStatus] = useState<string | null>(null)
+  const [planStatus, setPlanStatus] = useState<string | null>(null)
 
   useEffect(() => {
     setGeneratorSettings(state.generatorSettings)
@@ -60,6 +61,16 @@ export function SettingsPage() {
     [state.primaryColorId],
   )
 
+  const savedPlanSettings = state.generatorSettings
+
+  const planSettingsSnapshot = (settings: GeneratorSettings) =>
+    JSON.stringify(normalizeGeneratorSettings({}, settings, muscleGroups))
+
+  const planSettingsDirty = useMemo(
+    () => planSettingsSnapshot(generatorSettings) !== planSettingsSnapshot(savedPlanSettings),
+    [generatorSettings, savedPlanSettings, muscleGroups],
+  )
+
   const toggle = (id: LibraryEquipmentId) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -70,10 +81,17 @@ export function SettingsPage() {
     setEquipmentStatus(null)
   }
 
-  const applyGeneratorSettings = (patch: Partial<GeneratorSettings>) => {
+  const updateDraftPlanSettings = (patch: Partial<GeneratorSettings>) => {
     const next = normalizeGeneratorSettings(patch, generatorSettings, muscleGroups)
     setGeneratorSettings(next)
+    setPlanStatus(null)
+  }
+
+  const handleSavePlan = () => {
+    const next = normalizeGeneratorSettings({}, generatorSettings, muscleGroups)
+    setGeneratorSettings(next)
     saveGeneratorSettings(next)
+    setPlanStatus('Plan preferences saved.')
   }
 
   const customRotationMuscles =
@@ -87,12 +105,12 @@ export function SettingsPage() {
       else set.add(muscle)
       return [...set].sort((a, b) => a.localeCompare(b))
     })
-    applyGeneratorSettings({ customRotationMuscles: nextSlots })
+    updateDraftPlanSettings({ customRotationMuscles: nextSlots })
   }
 
   const clearCustomSlotMuscles = (slotIndex: number) => {
     const nextSlots = customRotationMuscles.map((groups, index) => (index === slotIndex ? [] : [...groups]))
-    applyGeneratorSettings({ customRotationMuscles: nextSlots })
+    updateDraftPlanSettings({ customRotationMuscles: nextSlots })
   }
 
   const handleSave = () => {
@@ -152,10 +170,11 @@ export function SettingsPage() {
           <span className="settings-disclosure-heading">
             <span className="generator-panel-title">Workout Plan</span>
             <span className="generator-panel-copy settings-disclosure-meta">
-              {generatorSettings.daysPerWeek} {generatorSettings.daysPerWeek === 1 ? 'day' : 'days'} per week
-              {generatorSettings.rotationMode === 'custom'
-                ? ` · ${generatorSettings.customRotationWeeks}-week rotation`
+              {savedPlanSettings.daysPerWeek} {savedPlanSettings.daysPerWeek === 1 ? 'day' : 'days'} per week
+              {savedPlanSettings.rotationMode === 'custom'
+                ? ` · ${savedPlanSettings.customRotationWeeks}-week rotation`
                 : ' · same split each week'}
+              {planSettingsDirty ? ' · unsaved changes' : ''}
             </span>
           </span>
           <span className="settings-disclosure-chevron" aria-hidden />
@@ -163,7 +182,8 @@ export function SettingsPage() {
         <div className="settings-disclosure-body">
         <div className="generator-panel-title">Days per week</div>
         <p className="generator-panel-copy">
-          How often you train and how your split rotates. Saved for your account—your home plan is not changed here.
+          How often you train and how your split rotates. Tap Save after you change anything—your home plan is not
+          updated here.
         </p>
         <AppSelect
           id="days-per-week"
@@ -173,7 +193,7 @@ export function SettingsPage() {
             value: days,
             label: `${days} ${days === 1 ? 'day' : 'days'} per week`,
           }))}
-          onChange={(days) => applyGeneratorSettings({ daysPerWeek: clampDaysPerWeek(days) })}
+          onChange={(days) => updateDraftPlanSettings({ daysPerWeek: clampDaysPerWeek(days) })}
         />
 
         <div className="generator-panel-title" style={{ marginTop: '1rem' }}>
@@ -191,7 +211,7 @@ export function SettingsPage() {
             { value: 'default' as RotationMode, label: 'Same split every week' },
             { value: 'custom' as RotationMode, label: 'Multi-week rotation' },
           ]}
-          onChange={(mode) => applyGeneratorSettings({ rotationMode: mode })}
+          onChange={(mode) => updateDraftPlanSettings({ rotationMode: mode })}
         />
 
         {generatorSettings.rotationMode === 'custom' ? (
@@ -204,7 +224,9 @@ export function SettingsPage() {
                 value: weeks as CustomRotationWeeks,
                 label: `${weeks} ${weeks === 1 ? 'week' : 'weeks'} before repeat`,
               }))}
-              onChange={(weeks) => applyGeneratorSettings({ customRotationWeeks: clampCustomRotationWeeks(weeks) })}
+              onChange={(weeks) =>
+                updateDraftPlanSettings({ customRotationWeeks: clampCustomRotationWeeks(weeks) })
+              }
               className="rotation-weeks-select"
             />
 
@@ -257,6 +279,21 @@ export function SettingsPage() {
               ))}
             </div>
           </>
+        ) : null}
+        {planSettingsDirty ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ marginTop: '0.75rem' }}
+            onClick={handleSavePlan}
+          >
+            Save
+          </button>
+        ) : null}
+        {planStatus ? (
+          <p className="generator-status" role="status">
+            {planStatus}
+          </p>
         ) : null}
         </div>
       </details>

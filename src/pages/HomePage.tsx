@@ -9,8 +9,8 @@ export function HomePage() {
   const sessions = getSessionsForUser(state)
   const latest = sessions[0]
   const today = new Date()
-  const schedule = buildDaySchedule(program, sessions)
   const hasPlan = program.days.length > 0
+  const schedule = buildDaySchedule(program, sessions)
   const todaySlot = schedule[0]
 
   return (
