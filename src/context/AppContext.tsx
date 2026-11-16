@@ -12,7 +12,7 @@ import {
   appendSession,
   applyProgram,
   getProgramForUser,
-  loadState,
+  loadStateAsync,
   setExerciseDisliked,
   updateEnabledLibraryEquipment,
   updatePrimaryColorId,
@@ -56,6 +56,7 @@ const AppContext = createContext<AppContextValue | null>(null)
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [state, setState] = useState<AppState | null>(null)
+  const [stateHydrating, setStateHydrating] = useState(true)
   const [catalog, setCatalog] = useState<LibraryExercise[]>([])
   const [catalogLoading, setCatalogLoading] = useState(true)
 
@@ -65,9 +66,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!uid) {
       setState(null)
+      setStateHydrating(false)
       return
     }
-    setState(loadState(uid, displayName))
+    let cancelled = false
+    setStateHydrating(true)
+    setState(null)
+    void loadStateAsync(uid, displayName).then((loaded) => {
+      if (!cancelled) {
+        setState(loaded)
+        setStateHydrating(false)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
   }, [uid, displayName])
 
   useEffect(() => {
@@ -215,11 +228,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExerciseDislikedPreference,
   ])
 
-  if (!value) {
+  if (!value || stateHydrating) {
     return (
       <div className="landing">
         <p className="landing-subtitle" style={{ textAlign: 'center' }}>
-          Loading your plan…
+          {stateHydrating ? 'Syncing your account…' : 'Loading your plan…'}
         </p>
       </div>
     )

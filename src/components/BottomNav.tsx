@@ -3,18 +3,24 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   IconHistory,
   IconHome,
-  IconLibrary,
   IconProgress,
   IconSettings,
   IconTrain,
 } from './BottomNavIcons'
 import type { ReactNode } from 'react'
 
-const links: { to: string; label: string; icon: ReactNode }[] = [
-  { to: '/home', label: 'Home', icon: <IconHome /> },
-  { to: '/workout', label: 'Train', icon: <IconTrain /> },
-  { to: '/library', label: 'Library', icon: <IconLibrary /> },
+interface NavLinkItem {
+  to: string
+  label: string
+  icon: ReactNode
+  center?: boolean
+}
+
+/** Home is centered; two tabs on each side. */
+const links: NavLinkItem[] = [
+  { to: '/library', label: 'Library', icon: <IconTrain /> },
   { to: '/progress', label: 'Progress', icon: <IconProgress /> },
+  { to: '/home', label: 'Home', icon: <IconHome />, center: true },
   { to: '/history', label: 'History', icon: <IconHistory /> },
   { to: '/settings', label: 'Settings', icon: <IconSettings /> },
 ]
@@ -24,6 +30,7 @@ interface SliderRect {
   y: number
   width: number
   height: number
+  home: boolean
 }
 
 export function BottomNav() {
@@ -37,14 +44,19 @@ export function BottomNav() {
 
     const syncSlider = () => {
       const active = nav.querySelector<HTMLElement>('a.active')
-      if (!active) return
+      if (!active) {
+        setSlider(null)
+        return
+      }
       const navRect = nav.getBoundingClientRect()
       const linkRect = active.getBoundingClientRect()
+      const home = active.classList.contains('bottom-nav-home')
       setSlider({
         x: linkRect.left - navRect.left,
         y: linkRect.top - navRect.top,
         width: linkRect.width,
         height: linkRect.height,
+        home,
       })
     }
 
@@ -57,7 +69,7 @@ export function BottomNav() {
     <nav ref={navRef} className="bottom-nav" aria-label="Main">
       {slider ? (
         <span
-          className="bottom-nav-slider"
+          className={`bottom-nav-slider${slider.home ? ' bottom-nav-slider--home' : ''}`}
           style={{
             width: slider.width,
             height: slider.height,
@@ -70,7 +82,11 @@ export function BottomNav() {
         <NavLink
           key={link.to}
           to={link.to}
-          className={({ isActive }) => (isActive ? 'active' : undefined)}
+          className={({ isActive }) =>
+            [link.center ? 'bottom-nav-home' : undefined, isActive ? 'active' : undefined]
+              .filter(Boolean)
+              .join(' ') || undefined
+          }
           end={link.to === '/home'}
           aria-label={link.label}
           title={link.label}

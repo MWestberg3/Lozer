@@ -2,13 +2,21 @@ import { createDefaultProfile, defaultProgram } from '../data/defaultProgram'
 import { DEFAULT_ENABLED_LIBRARY_EQUIPMENT, enabledEquipmentFromLegacyPreset } from '../lib/equipment'
 import { DEFAULT_THEME_COLOR_ID, isThemeColorId } from '../lib/theme'
 import { defaultGeneratorSettings } from '../lib/workoutGenerator'
+import { fetchRemoteAppState, writeRemoteAppState } from './firestoreAppState'
 import type { AppState, GeneratorSettings, Program, UserProfile, WorkoutSession } from '../types/workout'
 
 type LegacyGeneratorSettings = GeneratorSettings & { equipment?: 'full_gym' | 'dumbbells' | 'minimal' }
 
+interface LocalEnvelope {
+  state: AppState
+  syncedAt: string
+}
+
 function storageKey(uid: string) {
   return `lozer_app_v1_${uid}`
 }
+
+const firestoreSaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 function createDefaultState(uid: string, displayName: string): AppState {
   return {
@@ -23,7 +31,7 @@ function createDefaultState(uid: string, displayName: string): AppState {
   }
 }
 
-function migrateState(parsed: AppState, uid: string, displayName: string): AppState {
+export function migrateState(parsed: AppState, uid: string, displayName: string): AppState {
   const profile: UserProfile = {
     ...parsed.profile,
     id: uid,
@@ -57,31 +65,126 @@ function migrateState(parsed: AppState, uid: string, displayName: string): AppSt
   }
 }
 
-export function loadState(uid: string, displayName: string): AppState {
-  if (typeof localStorage === 'undefined') {
-    return createDefaultState(uid, displayName)
-  }
-
+function readLocalEnvelope(uid: string): LocalEnvelope | null {
+  if (typeof localStorage === 'undefined') return null
   const raw = localStorage.getItem(storageKey(uid))
-  if (!raw) {
-    const initial = createDefaultState(uid, displayName)
-    saveState(uid, initial)
-    return initial
-  }
-
+  if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as AppState
-    if (parsed.version !== 1) {
-      return createDefaultState(uid, displayName)
+    const parsed = JSON.parse(raw) as LocalEnvelope | AppState
+    if (parsed && typeof parsed === 'object' && 'state' in parsed && 'syncedAt' in parsed) {
+      return parsed as LocalEnvelope
     }
-    return migrateState(parsed, uid, displayName)
+    if (parsed && typeof parsed === 'object' && (parsed as AppState).version === 1) {
+      return { state: parsed as AppState, syncedAt: '1970-01-01T00:00:00.000Z' }
+    }
   } catch {
-    return createDefaultState(uid, displayName)
+    return null
   }
+  return null
+}
+
+function writeLocalEnvelope(uid: string, state: AppState, syncedAt: string): void {
+  if (typeof localStorage === 'undefined') return
+  const envelope: LocalEnvelope = { state, syncedAt }
+  localStorage.setItem(storageKey(uid), JSON.stringify(envelope))
+}
+
+function scheduleFirestoreSave(uid: string, state: AppState, syncedAt: string): void {
+  const existing = firestoreSaveTimers.get(uid)
+  if (existing) clearTimeout(existing)
+  const timer = setTimeout(() => {
+    firestoreSaveTimers.delete(uid)
+    void writeRemoteAppState(uid, state, syncedAt).catch((err) => {
+      console.warn('Firestore sync failed (data kept locally):', err)
+    })
+  }, 450)
+  firestoreSaveTimers.set(uid, timer)
 }
 
 export function saveState(uid: string, state: AppState): void {
-  localStorage.setItem(storageKey(uid), JSON.stringify(state))
+  const syncedAt = new Date().toISOString()
+  writeLocalEnvelope(uid, state, syncedAt)
+  scheduleFirestoreSave(uid, state, syncedAt)
+}
+
+export async function flushRemoteState(uid: string): Promise<void> {
+  const pending = firestoreSaveTimers.get(uid)
+  if (pending) {
+    clearTimeout(pending)
+    firestoreSaveTimers.delete(uid)
+  }
+  const envelope = readLocalEnvelope(uid)
+  if (!envelope) return
+  await writeRemoteAppState(uid, envelope.state, envelope.syncedAt)
+}
+
+/** Load app state: merge Firestore + local by `syncedAt`; upload when local is newer or missing remotely. */
+export async function loadStateAsync(uid: string, displayName: string): Promise<AppState> {
+  const local = readLocalEnvelope(uid)
+  let remoteRaw: Awaited<ReturnType<typeof fetchRemoteAppState>> = null
+  try {
+    remoteRaw = await fetchRemoteAppState(uid)
+  } catch (err) {
+    console.warn('Could not load from Firestore, using local cache:', err)
+  }
+
+  let remoteState: AppState | null = null
+  let remoteSyncedAt: string | null = null
+  if (remoteRaw) {
+    const { _syncedAt, ...rest } = remoteRaw
+    remoteSyncedAt = _syncedAt
+    remoteState = migrateState(rest as AppState, uid, displayName)
+  }
+
+  const localState = local ? migrateState(local.state, uid, displayName) : null
+  const localSyncedAt = local?.syncedAt ?? null
+
+  let winner: AppState
+  let winnerSyncedAt: string
+
+  if (localState && remoteState && localSyncedAt && remoteSyncedAt) {
+    if (localSyncedAt > remoteSyncedAt) {
+      winner = localState
+      winnerSyncedAt = localSyncedAt
+    } else {
+      winner = remoteState
+      winnerSyncedAt = remoteSyncedAt
+    }
+  } else if (remoteState && remoteSyncedAt) {
+    winner = remoteState
+    winnerSyncedAt = remoteSyncedAt
+  } else if (localState && localSyncedAt) {
+    winner = localState
+    winnerSyncedAt = localSyncedAt
+  } else {
+    winner = createDefaultState(uid, displayName)
+    winnerSyncedAt = new Date().toISOString()
+  }
+
+  writeLocalEnvelope(uid, winner, winnerSyncedAt)
+
+  const needsRemoteUpload =
+    !remoteRaw ||
+    (localSyncedAt != null &&
+      winnerSyncedAt === localSyncedAt &&
+      (!remoteSyncedAt || localSyncedAt > remoteSyncedAt))
+
+  if (needsRemoteUpload) {
+    scheduleFirestoreSave(uid, winner, winnerSyncedAt)
+  }
+
+  return winner
+}
+
+/** @deprecated Use loadStateAsync. Sync read for tests only. */
+export function loadState(uid: string, displayName: string): AppState {
+  const local = readLocalEnvelope(uid)
+  if (local) {
+    return migrateState(local.state, uid, displayName)
+  }
+  const initial = createDefaultState(uid, displayName)
+  saveState(uid, initial)
+  return initial
 }
 
 export function updateUserProfile(
