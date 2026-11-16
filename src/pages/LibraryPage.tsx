@@ -8,6 +8,7 @@ export function LibraryPage() {
   const [selectedEquipment, setSelectedEquipment] = useState<Set<string>>(() => new Set())
   const [selectedMuscles, setSelectedMuscles] = useState<Set<string>>(() => new Set())
   const [searchQuery, setSearchQuery] = useState('')
+  const [hideBlocked, setHideBlocked] = useState(true)
 
   const toggleEquipment = (id: string) => {
     setSelectedEquipment((prev) => {
@@ -27,6 +28,11 @@ export function LibraryPage() {
     })
   }
 
+  const clearEquipmentFilter = () => setSelectedEquipment(new Set())
+  const clearMuscleFilter = () => setSelectedMuscles(new Set())
+  const equipmentAllActive = selectedEquipment.size === 0
+  const muscleAllActive = selectedMuscles.size === 0
+
   const equipmentFilters = useMemo(() => {
     const present = new Set(catalog.map((exercise) => exercise.libraryEquipment))
     return LIBRARY_EQUIPMENT_OPTIONS.filter((option) => present.has(option.id))
@@ -36,23 +42,25 @@ export function LibraryPage() {
     const groups = new Set<string>()
     for (const exercise of catalog) groups.add(exercise.muscleGroup)
     const sorted = [...groups].sort((a, b) => a.localeCompare(b))
-    return [...sorted, 'Blocked']
+    return sorted
   }, [catalog])
 
   const searchNormalized = searchQuery.trim().toLowerCase()
   const filtersActive =
-    selectedEquipment.size > 0 || selectedMuscles.size > 0 || searchNormalized.length > 0
+    selectedEquipment.size > 0 ||
+    selectedMuscles.size > 0 ||
+    searchNormalized.length > 0 ||
+    !hideBlocked
 
   const filtered = useMemo(() => {
     if (!filtersActive) return []
-    const showBlocked = selectedMuscles.has('Blocked')
-    const muscleGroups = [...selectedMuscles].filter((item) => item !== 'Blocked')
+    const muscleGroups = [...selectedMuscles]
     return catalog.filter((exercise) => {
+      if (hideBlocked && isExerciseDisliked(exercise.id)) return false
       const equipmentMatch =
         selectedEquipment.size === 0 || selectedEquipment.has(exercise.libraryEquipment)
-      const blockedMatch = showBlocked && isExerciseDisliked(exercise.id)
       const groupMatch = muscleGroups.length > 0 && muscleGroups.includes(exercise.muscleGroup)
-      const muscleMatch = selectedMuscles.size === 0 || blockedMatch || groupMatch
+      const muscleMatch = muscleGroups.length === 0 || groupMatch
       const searchMatch =
         searchNormalized.length === 0 ||
         exercise.name.toLowerCase().includes(searchNormalized) ||
@@ -66,6 +74,7 @@ export function LibraryPage() {
     selectedMuscles,
     filtersActive,
     searchNormalized,
+    hideBlocked,
     isExerciseDisliked,
   ])
 
@@ -105,8 +114,25 @@ export function LibraryPage() {
         />
       </label>
 
+      <label className="library-show-blocked">
+        <input
+          type="checkbox"
+          checked={hideBlocked}
+          onChange={(e) => setHideBlocked(e.target.checked)}
+        />
+        <span>Hide blocked</span>
+      </label>
+
       <label className="field-label library-filter-label">Muscle group</label>
       <ScrollableChipRow>
+        <button
+          type="button"
+          className={`chip ${muscleAllActive ? 'active' : ''}`}
+          onClick={clearMuscleFilter}
+          aria-pressed={muscleAllActive}
+        >
+          All
+        </button>
         {muscleFilters.map((item) => (
           <button
             key={item}
@@ -120,8 +146,16 @@ export function LibraryPage() {
         ))}
       </ScrollableChipRow>
 
-      <label className="field-label library-filter-label">Machine</label>
+      <label className="field-label library-filter-label">Equipment</label>
       <ScrollableChipRow>
+        <button
+          type="button"
+          className={`chip ${equipmentAllActive ? 'active' : ''}`}
+          onClick={clearEquipmentFilter}
+          aria-pressed={equipmentAllActive}
+        >
+          All
+        </button>
         {equipmentFilters.map((option) => (
           <button
             key={option.id}

@@ -8,6 +8,7 @@ import { useApp } from '../context/AppContext'
 import { getSessionsForUser } from '../storage/db'
 import {
   DEFAULT_ENABLED_LIBRARY_EQUIPMENT,
+  equipmentLabel,
   LIBRARY_EQUIPMENT_OPTIONS,
   type LibraryEquipmentId,
 } from '../lib/equipment'
@@ -34,6 +35,8 @@ export function SettingsPage() {
     savePrimaryColor,
     saveGeneratorSettings,
     generatePlan,
+    dislikedExerciseIds,
+    setExerciseDislikedPreference,
   } = useApp()
   const [selected, setSelected] = useState<Set<LibraryEquipmentId>>(
     () => new Set(state.enabledLibraryEquipment as LibraryEquipmentId[]),
@@ -56,6 +59,11 @@ export function SettingsPage() {
   }, [selected])
 
   const muscleGroups = useMemo(() => sortedMuscleGroupsFromCatalog(catalog), [catalog])
+
+  const blockedExercises = useMemo(() => {
+    const blocked = new Set(dislikedExerciseIds)
+    return catalog.filter((exercise) => blocked.has(exercise.id))
+  }, [catalog, dislikedExerciseIds])
 
   const toggle = (id: LibraryEquipmentId) => {
     setSelected((prev) => {
@@ -345,6 +353,54 @@ export function SettingsPage() {
               {equipmentStatus}
             </p>
           ) : null}
+        </div>
+      </details>
+
+      <details className="card settings-disclosure" style={{ marginTop: '1rem' }}>
+        <summary className="settings-disclosure-summary">
+          <span className="settings-disclosure-heading">
+            <span className="generator-panel-title">Blocked</span>
+            <span className="generator-panel-copy settings-disclosure-meta">
+              {dislikedExerciseIds.length} don&rsquo;t recommend
+            </span>
+          </span>
+          <span className="settings-disclosure-chevron" aria-hidden />
+        </summary>
+        <div className="settings-disclosure-body">
+          {blockedExercises.length === 0 ? (
+            <p className="generator-panel-copy" style={{ margin: 0 }}>
+              No blocked exercises. Block lifts from the Library with &ldquo;Don&rsquo;t recommend.&rdquo;
+            </p>
+          ) : (
+            <ul className="settings-blocked-list">
+              {blockedExercises.map((exercise) => (
+                <li key={exercise.id} className="card library-item is-blocked settings-blocked-item">
+                  {exercise.imageUrl ? (
+                    <img
+                      src={exercise.imageUrl}
+                      alt=""
+                      className="library-thumb"
+                      loading="lazy"
+                      width={120}
+                      height={90}
+                    />
+                  ) : null}
+                  <strong>{exercise.name}</strong>
+                  <p className="library-item-meta">
+                    {exercise.muscleGroup} · {equipmentLabel(exercise.libraryEquipment)}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-small is-blocked-btn"
+                    style={{ marginTop: '0.5rem' }}
+                    onClick={() => setExerciseDislikedPreference(exercise.id, false)}
+                  >
+                    Allow again
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </details>
     </section>
