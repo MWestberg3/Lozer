@@ -13,6 +13,12 @@ import type { BlockMovement, LibraryExercise, WorkoutBlock, WorkoutBlockType } f
 
 const REST_PRESETS = [60, 90, 120, 180] as const
 const DEFAULT_BLOCK_BREAK_SEC = 90
+const CIRCUIT_DEFAULT_REPS = '10'
+
+function circuitRepsForRounds(movement: BlockMovement, rounds: number): string[] {
+  const fallback = movement.reps || CIRCUIT_DEFAULT_REPS
+  return Array.from({ length: rounds }, (_, index) => movement.repsPerRound?.[index] ?? fallback)
+}
 
 function defaultBreakAfterBlock(block: WorkoutBlock): number {
   if (block.type === 'circuit') return block.restBetweenRoundsSec ?? DEFAULT_BLOCK_BREAK_SEC
@@ -69,7 +75,6 @@ export function WorkoutPlanBuildPage() {
   const [dayBlocks, setDayBlocks] = useState<Record<string, WorkoutBlock[]>>(() =>
     dayBlocksFromProgram(program.days),
   )
-  const [saveStatus, setSaveStatus] = useState<string | null>(null)
   const [pickerBlockId, setPickerBlockId] = useState<string | null>(null)
 
   const activeBlocks = activeSlot ? (dayBlocks[activeSlot.id] ?? []) : []
@@ -108,7 +113,6 @@ export function WorkoutPlanBuildPage() {
   const setBlocksForActiveDay = (blocks: WorkoutBlock[]) => {
     if (!activeSlot) return
     setDayBlocks((prev) => ({ ...prev, [activeSlot.id]: blocks }))
-    setSaveStatus(null)
   }
 
   const addBlock = (type: WorkoutBlockType) => {
@@ -117,7 +121,18 @@ export function WorkoutPlanBuildPage() {
 
   const updateBlock = (blockId: string, patch: Partial<WorkoutBlock>) => {
     setBlocksForActiveDay(
-      activeBlocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block)),
+      activeBlocks.map((block) => {
+        if (block.id !== blockId) return block
+        const next: WorkoutBlock = { ...block, ...patch }
+        if (block.type === 'circuit' && patch.rounds != null && patch.rounds !== block.rounds) {
+          const rounds = patch.rounds
+          next.movements = next.movements.map((movement) => {
+            const nextPerRound = circuitRepsForRounds(movement, rounds)
+            return { ...movement, reps: nextPerRound[0] ?? CIRCUIT_DEFAULT_REPS, repsPerRound: nextPerRound }
+          })
+        }
+        return next
+      }),
     )
   }
 
@@ -127,7 +142,14 @@ export function WorkoutPlanBuildPage() {
   }
 
   const addMovement = (blockId: string, exercise: LibraryExercise) => {
+    const block = activeBlocks.find((b) => b.id === blockId)
     const movement = movementFromLibrary(exercise, state.generatorSettings.goal)
+    if (block?.type === 'circuit') {
+      const rounds = block.rounds ?? 3
+      movement.sets = 1
+      movement.reps = CIRCUIT_DEFAULT_REPS
+      movement.repsPerRound = Array.from({ length: rounds }, () => CIRCUIT_DEFAULT_REPS)
+    }
     setBlocksForActiveDay(
       activeBlocks.map((block) =>
         block.id === blockId ? { ...block, movements: [...block.movements, movement] } : block,
@@ -162,13 +184,13 @@ export function WorkoutPlanBuildPage() {
   const handleSavePlan = () => {
     const nextProgram = buildManualProgram(slots, dayBlocks, state.generatorSettings, program)
     generatePlan(nextProgram)
-    setSaveStatus('Plan saved. Head to Home when you’re ready to train.')
+    navigate('/plan')
   }
 
   if (slots.length === 0) {
     return (
       <section>
-        <Link to="/plan" className="text-link workout-preview-back">
+        <Link to="/plan/setup" className="text-link workout-preview-back">
           ← Split setup
         </Link>
         <p className="generator-panel-copy">Set days and rotation first, then come back to build workouts.</p>
@@ -179,7 +201,7 @@ export function WorkoutPlanBuildPage() {
   return (
     <section className="plan-build">
       <Link to="/plan" className="text-link workout-preview-back">
-        ← Split setup
+        ← Current plan
       </Link>
 
       <h1 className="page-title" style={{ marginTop: '0.75rem' }}>
@@ -312,44 +334,79 @@ export function WorkoutPlanBuildPage() {
                   </div>
                   <p className="library-item-meta">{movement.muscleGroup}</p>
                   <div className="plan-build-movement-controls">
-                    <label className="plan-build-field plan-build-field-inline">
-                      <span className="plan-build-field-label">Sets</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={12}
-                        value={movement.sets}
-                        onChange={(e) =>
-                          updateMovement(block.id, movement.id, {
-                            sets: Math.max(1, Number(e.target.value) || 1),
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="plan-build-field plan-build-field-inline">
-                      <span className="plan-build-field-label">Reps</span>
-                      <input
-                        type="text"
-                        value={movement.reps}
-                        onChange={(e) => updateMovement(block.id, movement.id, { reps: e.target.value })}
-                      />
-                    </label>
+                    {block.type === 'straight' ? (
+                      <label className="plan-build-field plan-build-field-inline">
+                        <span className="plan-build-field-label">Sets</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={12}
+                          value={movement.sets}
+                          onChange={(e) =>
+                            updateMovement(block.id, movement.id, {
+                              sets: Math.max(1, Number(e.target.value) || 1),
+                            })
+                          }
+                        />
+                      </label>
+                    ) : null}
+                    {block.type === 'circuit' ? (
+                      <div className="plan-build-circuit-reps">
+                        <div className="plan-build-reps-rounds">
+                          {Array.from({ length: block.rounds ?? 3 }, (_, roundIndex) => {
+                            const rounds = block.rounds ?? 3
+                            const roundReps = circuitRepsForRounds(movement, rounds)
+                            return (
+                              <label
+                                key={`${movement.id}-round-${roundIndex}`}
+                                className="plan-build-field plan-build-field-inline"
+                              >
+                                <span className="plan-build-field-label">R{roundIndex + 1}</span>
+                                <input
+                                  type="text"
+                                  value={roundReps[roundIndex]}
+                                  onChange={(e) => {
+                                    const next = [...roundReps]
+                                    next[roundIndex] = e.target.value
+                                    updateMovement(block.id, movement.id, {
+                                      repsPerRound: next,
+                                      reps: next[0] ?? CIRCUIT_DEFAULT_REPS,
+                                    })
+                                  }}
+                                />
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="plan-build-field plan-build-field-inline">
+                        <span className="plan-build-field-label">Reps</span>
+                        <input
+                          type="text"
+                          value={movement.reps}
+                          onChange={(e) => updateMovement(block.id, movement.id, { reps: e.target.value })}
+                        />
+                      </label>
+                    )}
                   </div>
-                  <div className="plan-build-rest-row">
-                    <span className="plan-build-field-label">Rest after</span>
-                    <div className="chip-row">
-                      {REST_PRESETS.map((sec) => (
-                        <button
-                          key={sec}
-                          type="button"
-                          className={`chip ${movement.restSeconds === sec ? 'active' : ''}`}
-                          onClick={() => updateMovement(block.id, movement.id, { restSeconds: sec })}
-                        >
-                          {sec}s
-                        </button>
-                      ))}
+                  {block.type === 'straight' ? (
+                    <div className="plan-build-rest-row">
+                      <span className="plan-build-field-label">Rest after</span>
+                      <div className="chip-row">
+                        {REST_PRESETS.map((sec) => (
+                          <button
+                            key={sec}
+                            type="button"
+                            className={`chip ${movement.restSeconds === sec ? 'active' : ''}`}
+                            onClick={() => updateMovement(block.id, movement.id, { restSeconds: sec })}
+                          >
+                            {sec}s
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -437,14 +494,6 @@ export function WorkoutPlanBuildPage() {
       <button type="button" className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={handleSavePlan}>
         Save plan
       </button>
-      {saveStatus ? (
-        <p className="generator-status" role="status">
-          {saveStatus}{' '}
-          <button type="button" className="text-link" onClick={() => navigate('/home')}>
-            Go to Home
-          </button>
-        </p>
-      ) : null}
     </section>
   )
 }

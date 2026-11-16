@@ -9,17 +9,36 @@ import type {
 } from '../types/workout'
 import type { PlanSlotInfo } from './workoutGenerator'
 
+export function formatCircuitMovementReps(movement: BlockMovement): string {
+  if (movement.repsPerRound?.length) {
+    return movement.repsPerRound.map((reps, index) => `R${index + 1}: ${reps}`).join(' · ')
+  }
+  return movement.reps ? `${movement.reps} each round` : '—'
+}
+
+function circuitMovementRepsForSave(movement: BlockMovement): string {
+  if (movement.repsPerRound?.length) {
+    return movement.repsPerRound.join(' / ')
+  }
+  return movement.reps
+}
+
 export function blocksToExercises(blocks: WorkoutBlock[]): ExerciseTemplate[] {
   const out: ExerciseTemplate[] = []
   for (const block of blocks) {
+    const setsForMovement = block.type === 'circuit' ? (block.rounds ?? 3) : undefined
     for (const movement of block.movements) {
       out.push({
         id: movement.id,
         name: movement.name,
         muscleGroup: movement.muscleGroup,
-        defaultSets: movement.sets,
-        defaultReps: movement.reps,
-        restSeconds: movement.restSeconds,
+        defaultSets: setsForMovement ?? movement.sets,
+        defaultReps:
+          block.type === 'circuit' ? circuitMovementRepsForSave(movement) : movement.reps,
+        restSeconds:
+          block.type === 'circuit'
+            ? (block.restBetweenStationsSec ?? movement.restSeconds)
+            : movement.restSeconds,
       })
     }
   }

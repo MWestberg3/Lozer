@@ -9,8 +9,9 @@ import { WorkoutPreviewPage } from './pages/WorkoutPreviewPage'
 import { ProgressPage } from './pages/ProgressPage'
 import { LibraryPage } from './pages/LibraryPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { WorkoutPlanPage } from './pages/WorkoutPlanPage'
 import { WorkoutPlanBuildPage } from './pages/WorkoutPlanBuildPage'
+import { WorkoutPlanPage } from './pages/WorkoutPlanPage'
+import { WorkoutPlanSetupPage } from './pages/WorkoutPlanSetupPage'
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/progress" element={<ProgressPage />} />
               <Route path="/plan" element={<WorkoutPlanPage />} />
+              <Route path="/plan/setup" element={<WorkoutPlanSetupPage />} />
               <Route path="/plan/build" element={<WorkoutPlanBuildPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/history" element={<Navigate to="/settings" replace />} />

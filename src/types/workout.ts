@@ -73,6 +73,8 @@ export interface BlockMovement {
   muscleGroup: string
   sets: number
   reps: string
+  /** When set, overrides `reps` per circuit round (length should match block rounds). */
+  repsPerRound?: string[]
   restSeconds: number
 }
 
